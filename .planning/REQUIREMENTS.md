@@ -35,21 +35,21 @@ Requirements for Per-Client Controls milestone.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FILT-01 | Pending | Pending |
-| FILT-02 | Pending | Pending |
-| FILT-03 | Pending | Pending |
-| TRIG-01 | Pending | Pending |
-| TRIG-02 | Pending | Pending |
-| TRIG-03 | Pending | Pending |
-| TRIG-04 | Pending | Pending |
-| TRIG-05 | Pending | Pending |
-| TRIG-06 | Pending | Pending |
+| FILT-01 | Phase 4 | Pending |
+| FILT-02 | Phase 4 | Pending |
+| FILT-03 | Phase 4 | Pending |
+| TRIG-01 | Phase 5 | Pending |
+| TRIG-02 | Phase 5 | Pending |
+| TRIG-03 | Phase 5 | Pending |
+| TRIG-04 | Phase 5 | Pending |
+| TRIG-05 | Phase 5 | Pending |
+| TRIG-06 | Phase 5 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 9 total
-- Mapped to phases: 0
-- Unmapped: 9 ⚠️
+- Mapped to phases: 9
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-25*
-*Last updated: 2026-03-25 after milestone v1.1 definition*
+*Last updated: 2026-03-25 after roadmap creation*

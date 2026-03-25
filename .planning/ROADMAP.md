@@ -1,22 +1,14 @@
 # Roadmap: Time Trigger API
 
-## Overview
+## Milestones
 
-Three phases that go from "can connect to MongoDB" to "reliably dispatches runs in Docker." Phase 1 establishes the foundation — MongoDB connection, database discovery, and startup validation. Phase 2 delivers the entire dispatch loop with all reliability guarantees (atomic claim, cycle guard, time gate, retry). Phase 3 hardens operations — parallelizes DB processing, adds the health endpoint, and validates Docker packaging.
+- ✅ **v1.0 MVP** - Phases 1-3 (shipped 2026-03-25)
+- 🚧 **v1.1 Per-Client Controls** - Phases 4-5 (in progress)
 
 ## Phases
 
-**Phase Numbering:**
-- Integer phases (1, 2, 3): Planned milestone work
-- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
-
-Decimal phases appear between their surrounding integers in numeric order.
-
-- [x] **Phase 1: Foundation** - MongoDB connection, database discovery, startup env validation, and structured logging (completed 2026-03-25)
-- [ ] **Phase 2: Core Dispatch Loop** - Scheduling, run detection, time gate, atomic webhook dispatch, and retry
-- [ ] **Phase 3: Operational Hardening** - Parallel DB processing, health endpoint, and Docker packaging
-
-## Phase Details
+<details>
+<summary>✅ v1.0 MVP (Phases 1-3) - SHIPPED 2026-03-25</summary>
 
 ### Phase 1: Foundation
 **Goal**: The service can connect to MongoDB, enumerate and filter eligible client databases, and log what it finds — proving the infrastructure works against real data before any dispatch logic is written
@@ -66,13 +58,50 @@ Plans:
 - [x] 03-02-PLAN.md — Create HealthController + HealthModule (GET /health), wire into AppModule
 - [x] 03-03-PLAN.md — Dockerfile (multi-stage node:22-slim), .dockerignore, docker-compose.yml, GitHub Actions workflow (ghcr.io)
 
+</details>
+
+### 🚧 v1.1 Per-Client Controls (In Progress)
+
+**Milestone Goal:** Granular per-client control — operators can restrict which databases the service processes via `TARGET_DATABASES` env var, and each client database can independently enable/disable Time Trigger and configure its own time-of-day and day-of-week constraints via a `timeTrigger` object in the `vars` collection.
+
+#### Phase 4: Database Targeting
+**Goal**: Operators can limit which client databases are processed by specifying a list in `TARGET_DATABASES`, without changing any code — unlisted databases are skipped before any collection checks or dispatch logic runs
+**Depends on**: Phase 3
+**Requirements**: FILT-01, FILT-02, FILT-03
+**Success Criteria** (what must be TRUE):
+  1. When `TARGET_DATABASES=*` or is absent, all collection-eligible databases are processed (existing behavior unchanged)
+  2. When `TARGET_DATABASES=sdr-4blue,dev`, only those two databases are considered for processing — all others are silently skipped
+  3. The database name filter is applied before the collection-presence check, so unlisted databases never have their collections queried
+  4. Structured log output shows which databases passed or were excluded by the `TARGET_DATABASES` filter
+**Plans**: TBD
+
+Plans:
+- [ ] 04-01: TBD
+
+#### Phase 5: Per-Client Time Controls
+**Goal**: Each client database controls whether Time Trigger runs at all, and during which hours and days, via a `timeTrigger` object in its `vars` document — replacing the old root-level fields with a dedicated, structured config
+**Depends on**: Phase 4
+**Requirements**: TRIG-01, TRIG-02, TRIG-03, TRIG-04, TRIG-05, TRIG-06
+**Success Criteria** (what must be TRUE):
+  1. A database whose `vars` document has no `timeTrigger` field is skipped — zero runs dispatched from it
+  2. A database with `timeTrigger.enabled: false` is skipped — zero runs dispatched from it
+  3. Runs are only dispatched within the window defined by `timeTrigger.morningLimit` and `timeTrigger.nightLimit` (root-level fields are not read)
+  4. Runs are only dispatched on days present in `timeTrigger.allowedDays`; runs on excluded days are skipped and remain `waiting`
+  5. Schema for the `timeTrigger` object is documented in `docs/vars-schema.md`
+**Plans**: TBD
+
+Plans:
+- [ ] 05-01: TBD
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 1. Foundation | 3/3 | Complete   | 2026-03-25 |
-| 2. Core Dispatch Loop | 2/3 | In Progress|  |
-| 3. Operational Hardening | 2/3 | In Progress|  |
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Foundation | v1.0 | 3/3 | Complete | 2026-03-25 |
+| 2. Core Dispatch Loop | v1.0 | 3/3 | Complete | 2026-03-25 |
+| 3. Operational Hardening | v1.0 | 3/3 | Complete | 2026-03-25 |
+| 4. Database Targeting | v1.1 | 0/? | Not started | - |
+| 5. Per-Client Time Controls | v1.1 | 0/? | Not started | - |
