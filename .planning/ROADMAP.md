@@ -31,7 +31,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [x] 01-01-PLAN.md — Install deps, wire ConfigModule globally, extract validateEnv(), prove fail-fast with unit tests
-- [ ] 01-02-PLAN.md — Build MongoService singleton (connect, listDatabaseNames, db()) and MongoModule; wire into AppModule
+- [x] 01-02-PLAN.md — Build MongoService singleton (connect, listDatabaseNames, db()) and MongoModule; wire into AppModule
 - [ ] 01-03-PLAN.md — Build DatabaseScanService (collection-presence filter, structured log), DatabaseModule, startup scan hook in AppModule
 
 ### Phase 2: Core Dispatch Loop

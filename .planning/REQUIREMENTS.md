@@ -9,8 +9,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Connection & Discovery
 
-- [ ] **CONN-01**: API connects to MongoDB replica set using `MONGODB_URI` from environment variables
-- [ ] **CONN-02**: API dynamically enumerates all databases in the MongoDB cluster
+- [x] **CONN-01**: API connects to MongoDB replica set using `MONGODB_URI` from environment variables
+- [x] **CONN-02**: API dynamically enumerates all databases in the MongoDB cluster
 - [ ] **CONN-03**: API filters databases — only processes those containing `runs`, `webhooks`, and `vars` collections
 - [x] **CONN-04**: API fails fast at startup with clear error if `MONGODB_URI` is missing
 - [x] **CONN-05**: API fails fast at startup with clear error if `CRON_INTERVAL` is missing
@@ -81,8 +81,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CONN-01 | Phase 1 | Pending |
-| CONN-02 | Phase 1 | Pending |
+| CONN-01 | Phase 1 | Complete |
+| CONN-02 | Phase 1 | Complete |
 | CONN-03 | Phase 1 | Pending |
 | CONN-04 | Phase 1 | Complete |
 | CONN-05 | Phase 1 | Complete |

@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 01-foundation-01-01-PLAN.md
-last_updated: "2026-03-25T15:24:27.909Z"
+stopped_at: Completed 01-foundation-01-02-PLAN.md
+last_updated: "2026-03-25T15:28:51.183Z"
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 01 (foundation) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -47,6 +47,7 @@ Plan: 2 of 3
 
 *Updated after each plan completion*
 | Phase 01-foundation P01 | 3 | 2 tasks | 5 files |
+| Phase 01-foundation P02 | 2min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -62,6 +63,8 @@ Recent decisions affecting current work:
 - [Phase 01-foundation]: Guard bootstrap() with require.main === module to enable test isolation for validateEnv()
 - [Phase 01-foundation]: Add jest moduleNameMapper to strip .js extensions for ts-jest + nodenext module resolution
 - [Phase 01-foundation]: ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }) in AppModule — ConfigService injectable project-wide
+- [Phase 01-foundation]: Single MongoClient singleton with pool options (maxPoolSize:20, minPoolSize:5) via OnModuleInit/OnModuleDestroy — all consumers call mongoService.db(name)
+- [Phase 01-foundation]: @Global() on MongoModule follows same pattern as ConfigModule isGlobal:true — registered once in AppModule, available project-wide without re-importing
 
 ### Pending Todos
 
@@ -75,6 +78,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T15:24:27.901Z
-Stopped at: Completed 01-foundation-01-01-PLAN.md
+Last session: 2026-03-25T15:28:51.177Z
+Stopped at: Completed 01-foundation-01-02-PLAN.md
 Resume file: None
