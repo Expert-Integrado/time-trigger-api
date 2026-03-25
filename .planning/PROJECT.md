@@ -12,7 +12,10 @@ Runs with `runStatus: "waiting"` must be detected and dispatched to their webhoo
 
 ### Validated
 
-(None yet — ship to validate)
+- ✓ Connects to MongoDB replica set and lists all databases — Phase 1
+- ✓ Filters databases: only process those with `runs`, `webhooks`, and `vars` collections — Phase 1
+- ✓ Fail fast with clear error if `MONGODB_URI` or `CRON_INTERVAL` missing — Phase 1
+- ✓ Structured logging for cycle and discovery activity — Phase 1
 
 ### Active
 
@@ -85,4 +88,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-25 after initialization*
+*Last updated: 2026-03-25 after Phase 1 completion*
