@@ -2,16 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Per-Client Controls
-status: planning
-stopped_at: "Completed 04-01-PLAN.md: TARGET_DATABASES filter in DatabaseScanService"
-last_updated: "2026-03-25T17:54:21.704Z"
-last_activity: 2026-03-25
+status: Phase complete — ready for verification
+stopped_at: "Completed 05-01-PLAN.md: timeTrigger per-client controls in RunDispatchService"
+last_updated: "2026-03-25T18:04:36.006Z"
 progress:
   total_phases: 2
-  completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
-  percent: 60
+  completed_phases: 2
+  total_plans: 2
+  completed_plans: 2
 ---
 
 # Project State
@@ -21,16 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Runs with `runStatus: "waiting"` must be detected and dispatched to their webhook reliably — no missed runs, no duplicate dispatches.
-**Current focus:** Phase 04 — database-targeting
+**Current focus:** Phase 05 — per-client-time-controls
 
 ## Current Position
 
-Phase: 5 of 05 (per client time controls)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-03-25
-
-Progress: [██████░░░░] 60% (3/5 phases complete)
+Phase: 05 (per-client-time-controls) — EXECUTING
+Plan: 1 of 1
 
 ## Performance Metrics
 
@@ -55,6 +49,7 @@ Progress: [██████░░░░] 60% (3/5 phases complete)
 
 *Updated after each plan completion*
 | Phase 04 P01 | 10 | 1 tasks | 2 files |
+| Phase 05-per-client-time-controls P01 | 2 | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -71,6 +66,8 @@ Recent decisions affecting current work:
 - [Phase 01]: @Global() on MongoModule — registered once in AppModule, available project-wide
 - [Phase 04]: TARGET_DATABASES filter applied before listCollections loop — db() never called for excluded databases (FILT-03)
 - [Phase 04]: ConfigService injection over process.env for proper NestJS DI and testability
+- [Phase 05-per-client-time-controls]: timeTrigger absence = warn + skip pattern; verification order: enabled -> time -> day -> webhooks -> runs
+- [Phase 05-per-client-time-controls]: isAllowedDay uses TZ=America/Sao_Paulo convention via new Date().getDay() — same as isWithinTimeWindow
 
 ### Pending Todos
 
@@ -83,6 +80,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T17:49:58.747Z
-Stopped at: Completed 04-01-PLAN.md: TARGET_DATABASES filter in DatabaseScanService
+Last session: 2026-03-25T18:04:36.002Z
+Stopped at: Completed 05-01-PLAN.md: timeTrigger per-client controls in RunDispatchService
 Resume file: None

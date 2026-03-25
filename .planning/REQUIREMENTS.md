@@ -15,12 +15,12 @@ Requirements for Per-Client Controls milestone.
 
 ### Time Trigger Config
 
-- [ ] **TRIG-01**: Reads `timeTrigger` object from each database's `vars` document
-- [ ] **TRIG-02**: If `timeTrigger` does not exist in vars, database is skipped (no runs processed)
-- [ ] **TRIG-03**: If `timeTrigger.enabled` is `false`, database is skipped
-- [ ] **TRIG-04**: Uses `timeTrigger.morningLimit` and `timeTrigger.nightLimit` for time-of-day gating (replaces root-level fields)
-- [ ] **TRIG-05**: Uses `timeTrigger.allowedDays` array to filter by day of week (0=Sunday...6=Saturday)
-- [ ] **TRIG-06**: Runs are skipped if current day of week is not in `allowedDays`
+- [x] **TRIG-01**: Reads `timeTrigger` object from each database's `vars` document
+- [x] **TRIG-02**: If `timeTrigger` does not exist in vars, database is skipped (no runs processed)
+- [x] **TRIG-03**: If `timeTrigger.enabled` is `false`, database is skipped
+- [x] **TRIG-04**: Uses `timeTrigger.morningLimit` and `timeTrigger.nightLimit` for time-of-day gating (replaces root-level fields)
+- [x] **TRIG-05**: Uses `timeTrigger.allowedDays` array to filter by day of week (0=Sunday...6=Saturday)
+- [x] **TRIG-06**: Runs are skipped if current day of week is not in `allowedDays`
 
 ## Out of Scope
 
@@ -38,12 +38,12 @@ Requirements for Per-Client Controls milestone.
 | FILT-01 | Phase 4 | Complete |
 | FILT-02 | Phase 4 | Complete |
 | FILT-03 | Phase 4 | Complete |
-| TRIG-01 | Phase 5 | Pending |
-| TRIG-02 | Phase 5 | Pending |
-| TRIG-03 | Phase 5 | Pending |
-| TRIG-04 | Phase 5 | Pending |
-| TRIG-05 | Phase 5 | Pending |
-| TRIG-06 | Phase 5 | Pending |
+| TRIG-01 | Phase 5 | Complete |
+| TRIG-02 | Phase 5 | Complete |
+| TRIG-03 | Phase 5 | Complete |
+| TRIG-04 | Phase 5 | Complete |
+| TRIG-05 | Phase 5 | Complete |
+| TRIG-06 | Phase 5 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 9 total
