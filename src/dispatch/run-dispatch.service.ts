@@ -4,9 +4,15 @@ import { DatabaseScanService } from '../database/database-scan.service.js';
 import { WebhookDispatchService } from './webhook-dispatch.service.js';
 import { Db, Document } from 'mongodb';
 
+interface TimeTriggerConfig {
+  enabled: boolean;
+  morningLimit: number;
+  nightLimit: number;
+  allowedDays: number[]; // 0=Domingo...6=Sábado
+}
+
 interface VarsDoc {
-  morningLimit?: number;
-  nightLimit?: number;
+  timeTrigger?: TimeTriggerConfig;
 }
 
 interface WebhookDoc {
@@ -64,17 +70,35 @@ export class RunDispatchService {
   private async processDatabase(dbName: string): Promise<void> {
     const db: Db = this.mongoService.db(dbName);
 
-    // DETECT-02: fresh vars read every cycle
+    // TRIG-01, TRIG-02: fresh vars read; timeTrigger obrigatório
     const vars = await db.collection('vars').findOne<VarsDoc>({});
-    if (!vars?.morningLimit || !vars?.nightLimit) {
+    if (!vars?.timeTrigger) {
       this.logger.warn(
-        `[${dbName}] Missing morningLimit/nightLimit in vars — skipping`,
+        `[${dbName}] timeTrigger not found in vars — skipping`,
       );
       return;
     }
 
-    // DETECT-04: time gate (TZ=America/Sao_Paulo makes getHours() return Brazil time)
-    if (!this.isWithinTimeWindow(vars.morningLimit, vars.nightLimit)) {
+    // TRIG-03: enabled flag
+    if (!vars.timeTrigger.enabled) {
+      this.logger.warn(
+        `[${dbName}] timeTrigger.enabled is false — skipping`,
+      );
+      return;
+    }
+
+    // TRIG-04: time gate (TZ=America/Sao_Paulo makes getHours() return Brazil time)
+    if (
+      !this.isWithinTimeWindow(
+        vars.timeTrigger.morningLimit,
+        vars.timeTrigger.nightLimit,
+      )
+    ) {
+      return;
+    }
+
+    // TRIG-05, TRIG-06: day-of-week gate
+    if (!this.isAllowedDay(vars.timeTrigger.allowedDays)) {
       return;
     }
 
@@ -99,8 +123,16 @@ export class RunDispatchService {
     }
   }
 
-  private isWithinTimeWindow(morningLimit: number, nightLimit: number): boolean {
+  private isWithinTimeWindow(
+    morningLimit: number,
+    nightLimit: number,
+  ): boolean {
     const currentHour = new Date().getHours(); // Brazil time due to TZ env
     return currentHour >= morningLimit && currentHour < nightLimit;
+  }
+
+  private isAllowedDay(allowedDays: number[]): boolean {
+    const currentDay = new Date().getDay(); // Brazil time due to TZ env
+    return allowedDays.includes(currentDay);
   }
 }
