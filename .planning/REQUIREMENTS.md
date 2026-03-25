@@ -9,9 +9,9 @@ Requirements for Per-Client Controls milestone.
 
 ### Database Filtering
 
-- [ ] **FILT-01**: `TARGET_DATABASES` env var accepts `*` (all) or comma-separated list (e.g., `sdr-4blue,dev`)
-- [ ] **FILT-02**: If `TARGET_DATABASES` is absent or `*`, all eligible databases are processed (current behavior preserved)
-- [ ] **FILT-03**: If a list is specified, only databases in the list are processed (filter applied before collection check)
+- [x] **FILT-01**: `TARGET_DATABASES` env var accepts `*` (all) or comma-separated list (e.g., `sdr-4blue,dev`)
+- [x] **FILT-02**: If `TARGET_DATABASES` is absent or `*`, all eligible databases are processed (current behavior preserved)
+- [x] **FILT-03**: If a list is specified, only databases in the list are processed (filter applied before collection check)
 
 ### Time Trigger Config
 
@@ -35,9 +35,9 @@ Requirements for Per-Client Controls milestone.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FILT-01 | Phase 4 | Pending |
-| FILT-02 | Phase 4 | Pending |
-| FILT-03 | Phase 4 | Pending |
+| FILT-01 | Phase 4 | Complete |
+| FILT-02 | Phase 4 | Complete |
+| FILT-03 | Phase 4 | Complete |
 | TRIG-01 | Phase 5 | Pending |
 | TRIG-02 | Phase 5 | Pending |
 | TRIG-03 | Phase 5 | Pending |

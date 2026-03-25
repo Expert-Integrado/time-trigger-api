@@ -1,15 +1,17 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.1
-milestone_name: per-client-controls
-status: Ready to plan
-stopped_at: Roadmap created for v1.1 — ready to plan Phase 4
-last_updated: "2026-03-25"
+milestone_name: Per-Client Controls
+status: planning
+stopped_at: "Completed 04-01-PLAN.md: TARGET_DATABASES filter in DatabaseScanService"
+last_updated: "2026-03-25T17:49:58.752Z"
+last_activity: 2026-03-25 — v1.1 roadmap created, ready to plan Phase 4
 progress:
-  total_phases: 5
-  completed_phases: 3
-  total_plans: 9
-  completed_plans: 9
+  total_phases: 2
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
+  percent: 60
 ---
 
 # Project State
@@ -52,6 +54,7 @@ Progress: [██████░░░░] 60% (3/5 phases complete)
 - Trend: Stable
 
 *Updated after each plan completion*
+| Phase 04 P01 | 10 | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -66,6 +69,8 @@ Recent decisions affecting current work:
 - [Phase 03]: Plain NestJS controller for health check — no @nestjs/terminus needed
 - [Phase 02]: isRunning guard uses try/finally reset — flag cleared even on error
 - [Phase 01]: @Global() on MongoModule — registered once in AppModule, available project-wide
+- [Phase 04]: TARGET_DATABASES filter applied before listCollections loop — db() never called for excluded databases (FILT-03)
+- [Phase 04]: ConfigService injection over process.env for proper NestJS DI and testability
 
 ### Pending Todos
 
@@ -78,6 +83,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25
-Stopped at: v1.1 roadmap written — Phase 4 and Phase 5 defined
+Last session: 2026-03-25T17:49:58.747Z
+Stopped at: Completed 04-01-PLAN.md: TARGET_DATABASES filter in DatabaseScanService
 Resume file: None
