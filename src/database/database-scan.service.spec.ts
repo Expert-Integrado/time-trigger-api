@@ -10,9 +10,11 @@ describe('DatabaseScanService', () => {
 
   const makeDb = (collectionNames: string[]) => ({
     listCollections: jest.fn().mockReturnValue({
-      toArray: jest.fn().mockResolvedValue(
-        collectionNames.map((name) => ({ name, type: 'collection' })),
-      ),
+      toArray: jest
+        .fn()
+        .mockResolvedValue(
+          collectionNames.map((name) => ({ name, type: 'collection' })),
+        ),
     }),
   });
 
@@ -43,8 +45,15 @@ describe('DatabaseScanService', () => {
   });
 
   it('skips system databases (admin, local, config) without calling listCollections on them', async () => {
-    mongoService.listDatabaseNames.mockResolvedValue(['admin', 'local', 'config', 'sdr-4blue']);
-    mongoService.db.mockReturnValue(makeDb(['runs', 'webhooks', 'vars']) as any);
+    mongoService.listDatabaseNames.mockResolvedValue([
+      'admin',
+      'local',
+      'config',
+      'sdr-4blue',
+    ]);
+    mongoService.db.mockReturnValue(
+      makeDb(['runs', 'webhooks', 'vars']) as any,
+    );
 
     await service.getEligibleDatabases();
 
@@ -57,7 +66,9 @@ describe('DatabaseScanService', () => {
 
   it('includes a database that has all three required collections', async () => {
     mongoService.listDatabaseNames.mockResolvedValue(['sdr-4blue']);
-    mongoService.db.mockReturnValue(makeDb(['runs', 'webhooks', 'vars']) as any);
+    mongoService.db.mockReturnValue(
+      makeDb(['runs', 'webhooks', 'vars']) as any,
+    );
 
     const result = await service.getEligibleDatabases();
 
@@ -92,7 +103,9 @@ describe('DatabaseScanService', () => {
   });
 
   it('excludes a database with only unrelated collections (e.g. chats)', async () => {
-    mongoService.listDatabaseNames.mockResolvedValue(['n8-santosbarrosadvogados']);
+    mongoService.listDatabaseNames.mockResolvedValue([
+      'n8-santosbarrosadvogados',
+    ]);
     mongoService.db.mockReturnValue(makeDb(['chats']) as any);
 
     const result = await service.getEligibleDatabases();
@@ -101,10 +114,17 @@ describe('DatabaseScanService', () => {
   });
 
   it('emits a log line with client DB count, eligible count, and skipped count', async () => {
-    const logSpy = jest.spyOn((service as any).logger, 'log').mockImplementation(() => {});
-    mongoService.listDatabaseNames.mockResolvedValue(['admin', 'sdr-4blue', 'chats-only']);
+    const logSpy = jest
+      .spyOn((service as any).logger, 'log')
+      .mockImplementation(() => {});
+    mongoService.listDatabaseNames.mockResolvedValue([
+      'admin',
+      'sdr-4blue',
+      'chats-only',
+    ]);
     mongoService.db.mockImplementation((name: string) => {
-      if (name === 'sdr-4blue') return makeDb(['runs', 'webhooks', 'vars']) as any;
+      if (name === 'sdr-4blue')
+        return makeDb(['runs', 'webhooks', 'vars']) as any;
       return makeDb(['chats']) as any;
     });
 
@@ -118,8 +138,14 @@ describe('DatabaseScanService', () => {
   describe('TARGET_DATABASES filter', () => {
     it('TARGET_DATABASES ausente → processa todos os bancos elegíveis (comportamento padrão)', async () => {
       configService.get.mockReturnValue(undefined);
-      mongoService.listDatabaseNames.mockResolvedValue(['sdr-4blue', 'dev', 'other-db']);
-      mongoService.db.mockReturnValue(makeDb(['runs', 'webhooks', 'vars']) as any);
+      mongoService.listDatabaseNames.mockResolvedValue([
+        'sdr-4blue',
+        'dev',
+        'other-db',
+      ]);
+      mongoService.db.mockReturnValue(
+        makeDb(['runs', 'webhooks', 'vars']) as any,
+      );
 
       const result = await service.getEligibleDatabases();
 
@@ -133,8 +159,14 @@ describe('DatabaseScanService', () => {
 
     it("TARGET_DATABASES='*' → processa todos os bancos elegíveis (nenhum filtro aplicado)", async () => {
       configService.get.mockReturnValue('*');
-      mongoService.listDatabaseNames.mockResolvedValue(['sdr-4blue', 'dev', 'other-db']);
-      mongoService.db.mockReturnValue(makeDb(['runs', 'webhooks', 'vars']) as any);
+      mongoService.listDatabaseNames.mockResolvedValue([
+        'sdr-4blue',
+        'dev',
+        'other-db',
+      ]);
+      mongoService.db.mockReturnValue(
+        makeDb(['runs', 'webhooks', 'vars']) as any,
+      );
 
       const result = await service.getEligibleDatabases();
 
@@ -148,8 +180,14 @@ describe('DatabaseScanService', () => {
 
     it("TARGET_DATABASES='sdr-4blue,dev' → apenas sdr-4blue e dev são checados; outros bancos ignorados", async () => {
       configService.get.mockReturnValue('sdr-4blue,dev');
-      mongoService.listDatabaseNames.mockResolvedValue(['sdr-4blue', 'dev', 'other-db']);
-      mongoService.db.mockReturnValue(makeDb(['runs', 'webhooks', 'vars']) as any);
+      mongoService.listDatabaseNames.mockResolvedValue([
+        'sdr-4blue',
+        'dev',
+        'other-db',
+      ]);
+      mongoService.db.mockReturnValue(
+        makeDb(['runs', 'webhooks', 'vars']) as any,
+      );
 
       const result = await service.getEligibleDatabases();
 
@@ -165,7 +203,9 @@ describe('DatabaseScanService', () => {
     it("TARGET_DATABASES='sdr-4blue' (banco não existe no Mongo) → retorna array vazio", async () => {
       configService.get.mockReturnValue('sdr-4blue');
       mongoService.listDatabaseNames.mockResolvedValue(['dev', 'other-db']);
-      mongoService.db.mockReturnValue(makeDb(['runs', 'webhooks', 'vars']) as any);
+      mongoService.db.mockReturnValue(
+        makeDb(['runs', 'webhooks', 'vars']) as any,
+      );
 
       const result = await service.getEligibleDatabases();
 
@@ -175,16 +215,26 @@ describe('DatabaseScanService', () => {
     });
 
     it('log inclui contagem de bancos excluídos quando filtro TARGET_DATABASES está ativo', async () => {
-      const logSpy = jest.spyOn((service as any).logger, 'log').mockImplementation(() => {});
+      const logSpy = jest
+        .spyOn((service as any).logger, 'log')
+        .mockImplementation(() => {});
       configService.get.mockReturnValue('sdr-4blue');
-      mongoService.listDatabaseNames.mockResolvedValue(['sdr-4blue', 'dev', 'other-db']);
-      mongoService.db.mockReturnValue(makeDb(['runs', 'webhooks', 'vars']) as any);
+      mongoService.listDatabaseNames.mockResolvedValue([
+        'sdr-4blue',
+        'dev',
+        'other-db',
+      ]);
+      mongoService.db.mockReturnValue(
+        makeDb(['runs', 'webhooks', 'vars']) as any,
+      );
 
       await service.getEligibleDatabases();
 
       // Deve emitir log sobre o filtro TARGET_DATABASES
       expect(logSpy).toHaveBeenCalledWith(
-        expect.stringMatching(/TARGET_DATABASES.*1 allowed.*2 excluded|TARGET_DATABASES.*allowed.*excluded/),
+        expect.stringMatching(
+          /TARGET_DATABASES.*1 allowed.*2 excluded|TARGET_DATABASES.*allowed.*excluded/,
+        ),
       );
     });
   });
