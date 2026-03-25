@@ -14,7 +14,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **CONN-03**: API filters databases — only processes those containing `runs`, `webhooks`, and `vars` collections
 - [x] **CONN-04**: API fails fast at startup with clear error if `MONGODB_URI` is missing
 - [x] **CONN-05**: API fails fast at startup with clear error if `CRON_INTERVAL` is missing
-- [ ] **CONN-06**: API processes all eligible databases in parallel using `Promise.allSettled` (one slow/failed DB does not block others)
+- [x] **CONN-06**: API processes all eligible databases in parallel using `Promise.allSettled` (one slow/failed DB does not block others)
 
 ### Scheduling
 
@@ -86,7 +86,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONN-03 | Phase 1 | Complete |
 | CONN-04 | Phase 1 | Complete |
 | CONN-05 | Phase 1 | Complete |
-| CONN-06 | Phase 3 | Pending |
+| CONN-06 | Phase 3 | Complete |
 | SCHED-01 | Phase 2 | Complete |
 | SCHED-02 | Phase 2 | Complete |
 | SCHED-03 | Phase 2 | Complete |
