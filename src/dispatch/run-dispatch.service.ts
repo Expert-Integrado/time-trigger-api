@@ -73,17 +73,13 @@ export class RunDispatchService {
     // TRIG-01, TRIG-02: fresh vars read; timeTrigger obrigatório
     const vars = await db.collection('vars').findOne<VarsDoc>({});
     if (!vars?.timeTrigger) {
-      this.logger.warn(
-        `[${dbName}] timeTrigger not found in vars — skipping`,
-      );
+      this.logger.warn(`[${dbName}] timeTrigger not found in vars — skipping`);
       return;
     }
 
     // TRIG-03: enabled flag
     if (!vars.timeTrigger.enabled) {
-      this.logger.warn(
-        `[${dbName}] timeTrigger.enabled is false — skipping`,
-      );
+      this.logger.warn(`[${dbName}] timeTrigger.enabled is false — skipping`);
       return;
     }
 
