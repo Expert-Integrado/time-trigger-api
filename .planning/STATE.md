@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: Milestone complete
-stopped_at: Completed 03-02-PLAN.md
+milestone: v1.1
+milestone_name: per-client-controls
+status: Defining requirements
+stopped_at: Milestone v1.1 started
 last_updated: "2026-03-25T17:17:03.358Z"
 progress:
   total_phases: 3

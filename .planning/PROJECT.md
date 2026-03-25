@@ -25,21 +25,25 @@ Runs with `runStatus: "waiting"` must be detected and dispatched to their webhoo
 - ✓ Retry once after 1 min, leaves as "waiting" if fails — Phase 2
 - ✓ HTTP timeout prevents hanging webhooks — Phase 2
 
+## Current Milestone: v1.1 Per-Client Controls
+
+**Goal:** Granular per-client control via `timeTrigger` config in vars collection + database filtering via env var
+
+**Target features:**
+- `TARGET_DATABASES` env var to filter which databases to process
+- Read `timeTrigger` config from vars (enabled, morningLimit, nightLimit, allowedDays)
+- Replace current root-level morningLimit/nightLimit with `timeTrigger.*` structure
+- Day-of-week filtering via allowedDays
+- Skip databases where `timeTrigger.enabled = false` or `timeTrigger` is missing
+
 ### Active
 
-- [ ] Cron job runs at a configurable interval (via `CRON_INTERVAL` env var)
-- [ ] Connects to MongoDB replica set and lists all databases
-- [ ] Filters databases: only process those with `runs`, `webhooks`, and `vars` collections
-- [ ] Finds runs where `runStatus: "waiting"` AND `waitUntil <= Date.now()`
-- [ ] Reads `vars` collection each execution to get `morningLimit` and `nightLimit` (hour boundaries)
-- [ ] Skips runs if current hour is outside allowed window (`morningLimit` to `nightLimit`)
-- [ ] Reads `webhooks` collection each execution to get "Processador de Runs" URL
-- [ ] POSTs the run document to the "Processador de Runs" webhook URL
-- [ ] On success: updates run to `runStatus: "queued"`, sets `queuedAt` to current timestamp
-- [ ] On failure: retries once after 1 minute; if retry fails, leaves run as `runStatus: "waiting"`
-- [ ] Re-reads `vars` and `webhooks` every execution cycle (configs can change at any time)
-- [ ] Runs in Docker container
-- [ ] MongoDB connection string configurable via `MONGODB_URI` env var
+- [ ] `TARGET_DATABASES` env var filters which databases to process (`*` = all, or comma-separated list)
+- [ ] Read `timeTrigger.enabled` from vars — skip database if false or missing
+- [ ] Read `timeTrigger.morningLimit` and `timeTrigger.nightLimit` from vars instead of root-level fields
+- [ ] Read `timeTrigger.allowedDays` from vars — skip runs if current day not in list
+- [ ] Refactor time gate logic to use new `timeTrigger.*` fields
+- [ ] Schema documented in `docs/vars-schema.md`
 
 ### Out of Scope
 
@@ -56,10 +60,10 @@ Runs with `runStatus: "waiting"` must be detected and dispatched to their webhoo
 - Each client DB has the same collection structure: `runs`, `webhooks`, `vars`, `chats`, `messages`, etc.
 - Some databases only have partial collections (e.g., only `chats`) — these should be skipped
 - The `webhooks` collection has one document per `botIdentifier` with named webhook URLs
-- The `vars` collection has `morningLimit` (start hour) and `nightLimit` (end hour) for time gating
-- The `vars` collection also has `morningLimitFUP` and `nightLimitFUP` in some databases
+- The `vars` collection now uses `timeTrigger` object for Time Trigger config (see `docs/vars-schema.md`)
+- Legacy `morningLimit`/`nightLimit` at root level are for other systems — Time Trigger reads `timeTrigger.*`
 - Run documents track their lifecycle: `waiting` → `queued` → (external processing) → `done`
-- The existing codebase is a fresh NestJS project (v11) with no business logic yet
+- v1.0 milestone complete: cron dispatch loop, parallel DB processing, Docker, CI/CD (49 tests)
 
 ## Constraints
 
@@ -96,4 +100,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-25 after Phase 3 completion (all phases done)*
+*Last updated: 2026-03-25 after milestone v1.1 started*
