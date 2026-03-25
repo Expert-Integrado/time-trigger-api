@@ -11,7 +11,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **CONN-01**: API connects to MongoDB replica set using `MONGODB_URI` from environment variables
 - [x] **CONN-02**: API dynamically enumerates all databases in the MongoDB cluster
-- [ ] **CONN-03**: API filters databases — only processes those containing `runs`, `webhooks`, and `vars` collections
+- [x] **CONN-03**: API filters databases — only processes those containing `runs`, `webhooks`, and `vars` collections
 - [x] **CONN-04**: API fails fast at startup with clear error if `MONGODB_URI` is missing
 - [x] **CONN-05**: API fails fast at startup with clear error if `CRON_INTERVAL` is missing
 - [ ] **CONN-06**: API processes all eligible databases in parallel using `Promise.allSettled` (one slow/failed DB does not block others)
@@ -41,7 +41,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Operational
 
 - [ ] **OPS-01**: Application runs inside a Docker container
-- [ ] **OPS-02**: Structured logging for cycle start/end, per-DB processing, dispatched runs, and errors
+- [x] **OPS-02**: Structured logging for cycle start/end, per-DB processing, dispatched runs, and errors
 - [ ] **OPS-03**: `GET /health` endpoint returns 200 with last cycle stats (timestamp, DBs scanned, runs dispatched, errors)
 
 ## v2 Requirements
@@ -83,7 +83,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | CONN-01 | Phase 1 | Complete |
 | CONN-02 | Phase 1 | Complete |
-| CONN-03 | Phase 1 | Pending |
+| CONN-03 | Phase 1 | Complete |
 | CONN-04 | Phase 1 | Complete |
 | CONN-05 | Phase 1 | Complete |
 | CONN-06 | Phase 3 | Pending |
@@ -101,7 +101,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DISP-05 | Phase 2 | Pending |
 | DISP-06 | Phase 2 | Pending |
 | OPS-01 | Phase 3 | Pending |
-| OPS-02 | Phase 1 | Pending |
+| OPS-02 | Phase 1 | Complete |
 | OPS-03 | Phase 3 | Pending |
 
 **Coverage:**
