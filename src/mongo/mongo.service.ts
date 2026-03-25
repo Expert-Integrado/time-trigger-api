@@ -36,9 +36,11 @@ export class MongoService implements OnModuleInit, OnModuleDestroy {
   }
 
   async listDatabaseNames(): Promise<string[]> {
-    const result = await this.client
+    const result = (await this.client
       .db('admin')
-      .command({ listDatabases: 1, nameOnly: true });
-    return result.databases.map((d: { name: string }) => d.name);
+      .command({ listDatabases: 1, nameOnly: true })) as {
+      databases: { name: string }[];
+    };
+    return result.databases.map((d) => d.name);
   }
 }
