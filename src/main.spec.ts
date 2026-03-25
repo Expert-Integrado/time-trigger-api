@@ -6,7 +6,9 @@ describe('validateEnv', () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
-    exitSpy = jest.spyOn(process, 'exit').mockImplementation((() => {}) as never);
+    exitSpy = jest
+      .spyOn(process, 'exit')
+      .mockImplementation((() => {}) as never);
     errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     process.env = {
       ...originalEnv,

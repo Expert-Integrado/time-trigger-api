@@ -9,12 +9,16 @@ export class WebhookDispatchService {
     const success = await this.post(webhookUrl, run);
 
     if (success) {
-      const result = await db.collection('runs').findOneAndUpdate(
-        { _id: run._id, runStatus: 'waiting' },
-        { $set: { runStatus: 'queued', queuedAt: new Date() } },
-      );
+      const result = await db
+        .collection('runs')
+        .findOneAndUpdate(
+          { _id: run._id, runStatus: 'waiting' },
+          { $set: { runStatus: 'queued', queuedAt: new Date() } },
+        );
       if (!result) {
-        this.logger.warn(`Run ${String(run._id)} already claimed by another cycle`);
+        this.logger.warn(
+          `Run ${String(run._id)} already claimed by another cycle`,
+        );
       }
       return;
     }
@@ -23,10 +27,12 @@ export class WebhookDispatchService {
     setTimeout(async () => {
       const retrySuccess = await this.post(webhookUrl, run);
       if (retrySuccess) {
-        await db.collection('runs').findOneAndUpdate(
-          { _id: run._id, runStatus: 'waiting' },
-          { $set: { runStatus: 'queued', queuedAt: new Date() } },
-        );
+        await db
+          .collection('runs')
+          .findOneAndUpdate(
+            { _id: run._id, runStatus: 'waiting' },
+            { $set: { runStatus: 'queued', queuedAt: new Date() } },
+          );
       }
       // DISP-05: if retry fails, leave run as 'waiting' — next cycle picks up
     }, 60_000);

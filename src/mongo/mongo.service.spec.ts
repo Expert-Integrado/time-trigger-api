@@ -67,7 +67,10 @@ describe('MongoService', () => {
     await service.onModuleInit();
     await service.listDatabaseNames();
     expect(mockDb).toHaveBeenCalledWith('admin');
-    expect(mockCommand).toHaveBeenCalledWith({ listDatabases: 1, nameOnly: true });
+    expect(mockCommand).toHaveBeenCalledWith({
+      listDatabases: 1,
+      nameOnly: true,
+    });
   });
 
   it('returns database name strings from listDatabaseNames', async () => {

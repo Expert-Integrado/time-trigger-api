@@ -50,7 +50,9 @@ describe('WebhookDispatchService', () => {
       webhookUrl,
       expect.objectContaining({
         method: 'POST',
-        headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
         body: JSON.stringify(run),
       }),
     );
@@ -131,7 +133,9 @@ describe('WebhookDispatchService', () => {
       .mockRejectedValueOnce(new DOMException('signal timed out', 'AbortError'))
       .mockResolvedValueOnce({ ok: false }); // retry also fails
 
-    await expect(service.dispatch(mockDb as unknown as Db, run, webhookUrl)).resolves.not.toThrow();
+    await expect(
+      service.dispatch(mockDb as unknown as Db, run, webhookUrl),
+    ).resolves.not.toThrow();
     expect(setTimeout).toHaveBeenCalledWith(expect.any(Function), 60_000);
   });
 });

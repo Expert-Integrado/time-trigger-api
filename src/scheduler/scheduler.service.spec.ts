@@ -75,7 +75,9 @@ describe('SchedulerService', () => {
     service.onModuleInit();
     service.onModuleDestroy();
 
-    expect(schedulerRegistry.deleteInterval).toHaveBeenCalledWith('dispatch-cycle');
+    expect(schedulerRegistry.deleteInterval).toHaveBeenCalledWith(
+      'dispatch-cycle',
+    );
   });
 
   it('CRON_INTERVAL string is converted to a Number before being passed to setInterval', () => {

@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { RunDispatchService } from '../dispatch/run-dispatch.service.js';
@@ -17,7 +22,9 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     // SCHED-02: dynamic registration at runtime (not static @Interval() decorator)
     // SCHED-01: interval period from CRON_INTERVAL env var
     // Pitfall 7: env vars are strings — cast explicitly with Number()
-    const intervalMs = Number(this.configService.getOrThrow<string>('CRON_INTERVAL'));
+    const intervalMs = Number(
+      this.configService.getOrThrow<string>('CRON_INTERVAL'),
+    );
     const intervalId = setInterval(
       () => void this.runDispatchService.runCycle(),
       intervalMs,
