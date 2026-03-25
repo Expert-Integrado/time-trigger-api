@@ -12,7 +12,7 @@ Three phases that go from "can connect to MongoDB" to "reliably dispatches runs 
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundation** - MongoDB connection, database discovery, startup env validation, and structured logging
+- [x] **Phase 1: Foundation** - MongoDB connection, database discovery, startup env validation, and structured logging (completed 2026-03-25)
 - [ ] **Phase 2: Core Dispatch Loop** - Scheduling, run detection, time gate, atomic webhook dispatch, and retry
 - [ ] **Phase 3: Operational Hardening** - Parallel DB processing, health endpoint, and Docker packaging
 
@@ -32,7 +32,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 - [x] 01-01-PLAN.md — Install deps, wire ConfigModule globally, extract validateEnv(), prove fail-fast with unit tests
 - [x] 01-02-PLAN.md — Build MongoService singleton (connect, listDatabaseNames, db()) and MongoModule; wire into AppModule
-- [ ] 01-03-PLAN.md — Build DatabaseScanService (collection-presence filter, structured log), DatabaseModule, startup scan hook in AppModule
+- [x] 01-03-PLAN.md — Build DatabaseScanService (collection-presence filter, structured log), DatabaseModule, startup scan hook in AppModule
 
 ### Phase 2: Core Dispatch Loop
 **Goal**: The service reliably detects waiting runs and dispatches them to webhooks — with no duplicate dispatches, no overlapping cycles, correct time-of-day gating, and a single retry on failure
@@ -63,6 +63,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 1/3 | In Progress|  |
+| 1. Foundation | 3/3 | Complete   | 2026-03-25 |
 | 2. Core Dispatch Loop | 0/TBD | Not started | - |
 | 3. Operational Hardening | 0/TBD | Not started | - |
