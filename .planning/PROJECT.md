@@ -16,6 +16,14 @@ Runs with `runStatus: "waiting"` must be detected and dispatched to their webhoo
 - ✓ Filters databases: only process those with `runs`, `webhooks`, and `vars` collections — Phase 1
 - ✓ Fail fast with clear error if `MONGODB_URI` or `CRON_INTERVAL` missing — Phase 1
 - ✓ Structured logging for cycle and discovery activity — Phase 1
+- ✓ Cron job runs at configurable interval via CRON_INTERVAL env var — Phase 2
+- ✓ Finds runs where runStatus "waiting" AND waitUntil <= now — Phase 2
+- ✓ Reads vars/webhooks fresh each cycle (no caching) — Phase 2
+- ✓ Skips runs outside morningLimit/nightLimit time window — Phase 2
+- ✓ POSTs run to "Processador de Runs" webhook URL — Phase 2
+- ✓ Atomic findOneAndUpdate prevents duplicate dispatch — Phase 2
+- ✓ Retry once after 1 min, leaves as "waiting" if fails — Phase 2
+- ✓ HTTP timeout prevents hanging webhooks — Phase 2
 
 ### Active
 
@@ -88,4 +96,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-25 after Phase 1 completion*
+*Last updated: 2026-03-25 after Phase 2 completion*
