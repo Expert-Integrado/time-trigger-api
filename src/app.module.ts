@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from './database/database.module.js';
 import { DatabaseScanService } from './database/database-scan.service.js';
 import { MongoModule } from './mongo/mongo.module.js';
+import { SchedulerModule } from './scheduler/scheduler.module.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 
@@ -11,6 +12,7 @@ import { AppService } from './app.service.js';
     ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
     MongoModule,
     DatabaseModule,
+    SchedulerModule,
   ],
   controllers: [AppController],
   providers: [AppService],
