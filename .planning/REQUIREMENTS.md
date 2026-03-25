@@ -42,7 +42,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [ ] **OPS-01**: Application runs inside a Docker container
 - [x] **OPS-02**: Structured logging for cycle start/end, per-DB processing, dispatched runs, and errors
-- [ ] **OPS-03**: `GET /health` endpoint returns 200 with last cycle stats (timestamp, DBs scanned, runs dispatched, errors)
+- [x] **OPS-03**: `GET /health` endpoint returns 200 with last cycle stats (timestamp, DBs scanned, runs dispatched, errors)
 
 ## v2 Requirements
 
@@ -102,7 +102,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DISP-06 | Phase 2 | Complete |
 | OPS-01 | Phase 3 | Pending |
 | OPS-02 | Phase 1 | Complete |
-| OPS-03 | Phase 3 | Pending |
+| OPS-03 | Phase 3 | Complete |
 
 **Coverage:**
 - v1 requirements: 22 total
