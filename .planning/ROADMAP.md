@@ -73,10 +73,10 @@ Plans:
   2. When `TARGET_DATABASES=sdr-4blue,dev`, only those two databases are considered for processing — all others are silently skipped
   3. The database name filter is applied before the collection-presence check, so unlisted databases never have their collections queried
   4. Structured log output shows which databases passed or were excluded by the `TARGET_DATABASES` filter
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 04-01: TBD
+- [ ] 04-01-PLAN.md — Injetar ConfigService em DatabaseScanService, aplicar filtro TARGET_DATABASES antes do loop de coleções, testes TDD
 
 #### Phase 5: Per-Client Time Controls
 **Goal**: Each client database controls whether Time Trigger runs at all, and during which hours and days, via a `timeTrigger` object in its `vars` document — replacing the old root-level fields with a dedicated, structured config
@@ -103,5 +103,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Foundation | v1.0 | 3/3 | Complete | 2026-03-25 |
 | 2. Core Dispatch Loop | v1.0 | 3/3 | Complete | 2026-03-25 |
 | 3. Operational Hardening | v1.0 | 3/3 | Complete | 2026-03-25 |
-| 4. Database Targeting | v1.1 | 0/? | Not started | - |
+| 4. Database Targeting | v1.1 | 0/1 | Not started | - |
 | 5. Per-Client Time Controls | v1.1 | 0/? | Not started | - |
