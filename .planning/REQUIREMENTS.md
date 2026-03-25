@@ -18,9 +18,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Scheduling
 
-- [ ] **SCHED-01**: Cron job runs at an interval configured via `CRON_INTERVAL` environment variable
-- [ ] **SCHED-02**: Cron interval is registered dynamically at runtime (not via static `@Cron()` decorator)
-- [ ] **SCHED-03**: Overlapping cron cycles are prevented (guard flag ensures previous cycle completes before next starts)
+- [x] **SCHED-01**: Cron job runs at an interval configured via `CRON_INTERVAL` environment variable
+- [x] **SCHED-02**: Cron interval is registered dynamically at runtime (not via static `@Cron()` decorator)
+- [x] **SCHED-03**: Overlapping cron cycles are prevented (guard flag ensures previous cycle completes before next starts)
 
 ### Run Detection
 
@@ -87,9 +87,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONN-04 | Phase 1 | Complete |
 | CONN-05 | Phase 1 | Complete |
 | CONN-06 | Phase 3 | Pending |
-| SCHED-01 | Phase 2 | Pending |
-| SCHED-02 | Phase 2 | Pending |
-| SCHED-03 | Phase 2 | Pending |
+| SCHED-01 | Phase 2 | Complete |
+| SCHED-02 | Phase 2 | Complete |
+| SCHED-03 | Phase 2 | Complete |
 | DETECT-01 | Phase 2 | Complete |
 | DETECT-02 | Phase 2 | Complete |
 | DETECT-03 | Phase 2 | Complete |

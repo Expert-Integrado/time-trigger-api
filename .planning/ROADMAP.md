@@ -49,7 +49,7 @@ Plans:
 Plans:
 - [x] 02-01-PLAN.md — WebhookDispatchService: HTTP POST dispatch, atomic run claim, single non-blocking retry, 10s fetch timeout
 - [x] 02-02-PLAN.md — RunDispatchService + DispatchModule: cycle guard, fresh config reads, time gate, run detection
-- [ ] 02-03-PLAN.md — SchedulerService + SchedulerModule: dynamic interval via SchedulerRegistry, AppModule wiring
+- [x] 02-03-PLAN.md — SchedulerService + SchedulerModule: dynamic interval via SchedulerRegistry, AppModule wiring
 
 ### Phase 3: Operational Hardening
 **Goal**: The service processes all eligible databases in parallel, exposes a health endpoint for monitoring, and runs correctly inside a Docker container with UTC time enforcement
