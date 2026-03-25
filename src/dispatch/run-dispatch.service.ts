@@ -38,15 +38,22 @@ export class RunDispatchService {
       this.logger.log(`Cycle #${cycle} started`);
       const databases = await this.databaseScanService.getEligibleDatabases();
 
-      for (const dbName of databases) {
-        try {
-          await this.processDatabase(dbName);
-        } catch (err) {
-          this.logger.error(`[${dbName}] Unhandled error during processing: ${String(err)}`);
-        }
-      }
+      const results = await Promise.allSettled(
+        databases.map((dbName) => this.processDatabase(dbName)),
+      );
 
-      this.logger.log(`Cycle #${cycle} complete`);
+      results.forEach((r, i) => {
+        if (r.status === 'rejected') {
+          this.logger.error(
+            `[${databases[i]}] Unhandled error during processing: ${String(r.reason)}`,
+          );
+        }
+      });
+
+      const errorCount = results.filter((r) => r.status === 'rejected').length;
+      this.logger.log(
+        `Cycle #${cycle} complete — ${databases.length} DBs, ${errorCount} errors`,
+      );
     } catch (err) {
       this.logger.error(`Cycle #${cycle} failed: ${String(err)}`);
     } finally {

@@ -224,4 +224,37 @@ describe('RunDispatchService', () => {
 
     expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining('previous cycle'));
   });
+
+  it('(CONN-06) a failing DB does not prevent other DBs from being processed', async () => {
+    const goodDb = makeDb(withinWindowVars, webhooksDoc, [eligibleRun]);
+    const failingDbName = 'bad-db';
+    const goodDbName = 'good-db';
+
+    databaseScanService.getEligibleDatabases.mockResolvedValue([failingDbName, goodDbName]);
+    mongoService.db.mockImplementation((name: string) => {
+      if (name === failingDbName) throw new Error('connection refused');
+      return goodDb as unknown as Db;
+    });
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+
+    await expect(service.runCycle()).resolves.not.toThrow();
+    expect(webhookDispatchService.dispatch).toHaveBeenCalledTimes(1);
+    jest.restoreAllMocks();
+  });
+
+  it('(CONN-06) cycle log includes DB count and error count after allSettled', async () => {
+    const goodDb = makeDb(withinWindowVars, webhooksDoc, []);
+    databaseScanService.getEligibleDatabases.mockResolvedValue(['db-a', 'db-b']);
+    mongoService.db.mockImplementation((name: string) => {
+      if (name === 'db-b') throw new Error('oops');
+      return goodDb as unknown as Db;
+    });
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+    const logSpy = jest.spyOn((service as any).logger, 'log').mockImplementation(() => {});
+
+    await service.runCycle();
+
+    expect(logSpy).toHaveBeenCalledWith(expect.stringMatching(/2 DBs.*1 errors/));
+    jest.restoreAllMocks();
+  });
 });
