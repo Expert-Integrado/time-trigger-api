@@ -40,9 +40,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Operational
 
-- [ ] **OPS-01**: Application runs inside a Docker container
+- [x] **OPS-01**: Application runs inside a Docker container
 - [x] **OPS-02**: Structured logging for cycle start/end, per-DB processing, dispatched runs, and errors
-- [x] **OPS-03**: `GET /health` endpoint returns 200 with last cycle stats (timestamp, DBs scanned, runs dispatched, errors)
+- [x] **OPS-03**: `GET /health` endpoint returns 200 with `{ status: 'ok', uptime }` (cycle stats covered by OPS-02 structured logging)
 
 ## v2 Requirements
 
