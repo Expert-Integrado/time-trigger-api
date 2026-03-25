@@ -18,7 +18,10 @@ describe('RunDispatchService', () => {
     runs: Record<string, unknown>[],
   ) => {
     const mockFind = { toArray: jest.fn().mockResolvedValue(runs) };
-    const collections: Record<string, { findOne?: jest.Mock; find?: jest.Mock }> = {
+    const collections: Record<
+      string,
+      { findOne?: jest.Mock; find?: jest.Mock }
+    > = {
       vars: { findOne: jest.fn().mockResolvedValue(vars) },
       webhooks: { findOne: jest.fn().mockResolvedValue(webhooks) },
       runs: { find: jest.fn().mockReturnValue(mockFind) },
@@ -35,6 +38,8 @@ describe('RunDispatchService', () => {
     waitUntil: new Date('2020-01-01'),
   };
 
+  const allowedDay = 1; // segunda-feira
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -49,7 +54,9 @@ describe('RunDispatchService', () => {
         },
         {
           provide: DatabaseScanService,
-          useValue: { getEligibleDatabases: jest.fn().mockResolvedValue(['test-db']) },
+          useValue: {
+            getEligibleDatabases: jest.fn().mockResolvedValue(['test-db']),
+          },
         },
       ],
     }).compile();
@@ -60,13 +67,21 @@ describe('RunDispatchService', () => {
     databaseScanService = module.get(DatabaseScanService);
   });
 
-  const withinWindowVars = { morningLimit: 8, nightLimit: 22 };
+  const withinWindowVars = {
+    timeTrigger: {
+      enabled: true,
+      morningLimit: 8,
+      nightLimit: 22,
+      allowedDays: [0, 1, 2, 3, 4, 5, 6],
+    },
+  };
   const webhooksDoc = { 'Processador de Runs': 'https://hook.example.com' };
 
   it('(DETECT-01) queries runs collection with runStatus:waiting and waitUntil <= now', async () => {
     const db = makeDb(withinWindowVars, webhooksDoc, []);
     mongoService.db.mockReturnValue(db as unknown as Db);
     jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
 
     await service.runCycle();
 
@@ -87,6 +102,7 @@ describe('RunDispatchService', () => {
       .mockResolvedValueOnce(['db-1'])
       .mockResolvedValueOnce(['db-1']);
     jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
 
     await service.runCycle();
     // Reset call count
@@ -107,9 +123,11 @@ describe('RunDispatchService', () => {
       .mockResolvedValueOnce(['db-1'])
       .mockResolvedValueOnce(['db-1']);
     jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
 
     await service.runCycle();
-    const webhooksFindOne = (db as any)._collections.webhooks.findOne as jest.Mock;
+    const webhooksFindOne = (db as any)._collections.webhooks
+      .findOne as jest.Mock;
     const firstCallCount = webhooksFindOne.mock.calls.length;
 
     await service.runCycle();
@@ -119,10 +137,69 @@ describe('RunDispatchService', () => {
     jest.restoreAllMocks();
   });
 
-  it('(DETECT-04) skips dispatch when currentHour < morningLimit', async () => {
-    const db = makeDb({ morningLimit: 8, nightLimit: 22 }, webhooksDoc, [eligibleRun]);
+  it('(TRIG-01) skips when timeTrigger field is absent from vars', async () => {
+    const db = makeDb({ botIdentifier: 'x' }, webhooksDoc, [eligibleRun]);
+    mongoService.db.mockReturnValue(db as unknown as Db);
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+    await service.runCycle();
+
+    expect(webhookDispatchService.dispatch).not.toHaveBeenCalled();
+    jest.restoreAllMocks();
+  });
+
+  it('(TRIG-02) skips when vars document is null', async () => {
+    const db = makeDb(null, webhooksDoc, [eligibleRun]);
+    mongoService.db.mockReturnValue(db as unknown as Db);
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+    await service.runCycle();
+
+    expect(webhookDispatchService.dispatch).not.toHaveBeenCalled();
+    jest.restoreAllMocks();
+  });
+
+  it('(TRIG-03) skips when timeTrigger.enabled is false', async () => {
+    const db = makeDb(
+      {
+        timeTrigger: {
+          enabled: false,
+          morningLimit: 8,
+          nightLimit: 22,
+          allowedDays: [0, 1, 2, 3, 4, 5, 6],
+        },
+      },
+      webhooksDoc,
+      [eligibleRun],
+    );
+    mongoService.db.mockReturnValue(db as unknown as Db);
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+    await service.runCycle();
+
+    expect(webhookDispatchService.dispatch).not.toHaveBeenCalled();
+    jest.restoreAllMocks();
+  });
+
+  it('(TRIG-04) skips when currentHour < timeTrigger.morningLimit', async () => {
+    const db = makeDb(
+      {
+        timeTrigger: {
+          enabled: true,
+          morningLimit: 8,
+          nightLimit: 22,
+          allowedDays: [0, 1, 2, 3, 4, 5, 6],
+        },
+      },
+      webhooksDoc,
+      [eligibleRun],
+    );
     mongoService.db.mockReturnValue(db as unknown as Db);
     jest.spyOn(Date.prototype, 'getHours').mockReturnValue(6); // before 8am
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
 
     await service.runCycle();
 
@@ -130,10 +207,22 @@ describe('RunDispatchService', () => {
     jest.restoreAllMocks();
   });
 
-  it('(DETECT-04) skips dispatch when currentHour >= nightLimit', async () => {
-    const db = makeDb({ morningLimit: 8, nightLimit: 22 }, webhooksDoc, [eligibleRun]);
+  it('(TRIG-04) skips when currentHour >= timeTrigger.nightLimit', async () => {
+    const db = makeDb(
+      {
+        timeTrigger: {
+          enabled: true,
+          morningLimit: 8,
+          nightLimit: 20,
+          allowedDays: [0, 1, 2, 3, 4, 5, 6],
+        },
+      },
+      webhooksDoc,
+      [eligibleRun],
+    );
     mongoService.db.mockReturnValue(db as unknown as Db);
-    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(23); // after 10pm
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(23); // after 8pm
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
 
     await service.runCycle();
 
@@ -141,10 +230,68 @@ describe('RunDispatchService', () => {
     jest.restoreAllMocks();
   });
 
-  it('(DETECT-04) dispatches runs when currentHour is within [morningLimit, nightLimit)', async () => {
-    const db = makeDb({ morningLimit: 8, nightLimit: 22 }, webhooksDoc, [eligibleRun]);
+  it('(TRIG-04) dispatches when currentHour within timeTrigger window', async () => {
+    const db = makeDb(
+      {
+        timeTrigger: {
+          enabled: true,
+          morningLimit: 8,
+          nightLimit: 22,
+          allowedDays: [0, 1, 2, 3, 4, 5, 6],
+        },
+      },
+      webhooksDoc,
+      [eligibleRun],
+    );
     mongoService.db.mockReturnValue(db as unknown as Db);
     jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10); // within window
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+    await service.runCycle();
+
+    expect(webhookDispatchService.dispatch).toHaveBeenCalledTimes(1);
+    jest.restoreAllMocks();
+  });
+
+  it('(TRIG-06) skips when currentDay not in timeTrigger.allowedDays', async () => {
+    const db = makeDb(
+      {
+        timeTrigger: {
+          enabled: true,
+          morningLimit: 8,
+          nightLimit: 22,
+          allowedDays: [1, 2, 3, 4, 5],
+        },
+      },
+      webhooksDoc,
+      [eligibleRun],
+    );
+    mongoService.db.mockReturnValue(db as unknown as Db);
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(0); // domingo, não permitido
+
+    await service.runCycle();
+
+    expect(webhookDispatchService.dispatch).not.toHaveBeenCalled();
+    jest.restoreAllMocks();
+  });
+
+  it('(TRIG-05/TRIG-06) dispatches when currentDay in timeTrigger.allowedDays', async () => {
+    const db = makeDb(
+      {
+        timeTrigger: {
+          enabled: true,
+          morningLimit: 8,
+          nightLimit: 22,
+          allowedDays: [1, 2, 3, 4, 5],
+        },
+      },
+      webhooksDoc,
+      [eligibleRun],
+    );
+    mongoService.db.mockReturnValue(db as unknown as Db);
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(1); // segunda, permitido
 
     await service.runCycle();
 
@@ -155,17 +302,23 @@ describe('RunDispatchService', () => {
   it('skips database and logs warning when vars document is null', async () => {
     const db = makeDb(null, webhooksDoc, [eligibleRun]);
     mongoService.db.mockReturnValue(db as unknown as Db);
-    const warnSpy = jest.spyOn((service as any).logger, 'warn').mockImplementation(() => {});
+    const warnSpy = jest
+      .spyOn((service as any).logger, 'warn')
+      .mockImplementation(() => {});
 
     await expect(service.runCycle()).resolves.not.toThrow();
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('morningLimit'));
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('timeTrigger'),
+    );
     expect(webhookDispatchService.dispatch).not.toHaveBeenCalled();
   });
 
-  it('skips database and logs warning when vars is missing morningLimit', async () => {
-    const db = makeDb({ nightLimit: 22 }, webhooksDoc, [eligibleRun]);
+  it('skips database and logs warning when vars is missing timeTrigger', async () => {
+    const db = makeDb({ botIdentifier: 'x' }, webhooksDoc, [eligibleRun]);
     mongoService.db.mockReturnValue(db as unknown as Db);
-    const warnSpy = jest.spyOn((service as any).logger, 'warn').mockImplementation(() => {});
+    const warnSpy = jest
+      .spyOn((service as any).logger, 'warn')
+      .mockImplementation(() => {});
 
     await expect(service.runCycle()).resolves.not.toThrow();
     expect(warnSpy).toHaveBeenCalled();
@@ -176,10 +329,15 @@ describe('RunDispatchService', () => {
     const db = makeDb(withinWindowVars, {}, [eligibleRun]);
     mongoService.db.mockReturnValue(db as unknown as Db);
     jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
-    const warnSpy = jest.spyOn((service as any).logger, 'warn').mockImplementation(() => {});
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+    const warnSpy = jest
+      .spyOn((service as any).logger, 'warn')
+      .mockImplementation(() => {});
 
     await expect(service.runCycle()).resolves.not.toThrow();
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Processador de Runs'));
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Processador de Runs'),
+    );
     expect(webhookDispatchService.dispatch).not.toHaveBeenCalled();
     jest.restoreAllMocks();
   });
@@ -194,7 +352,9 @@ describe('RunDispatchService', () => {
       firstCyclePromise.then(() => []),
     );
 
-    const warnSpy = jest.spyOn((service as any).logger, 'warn').mockImplementation(() => {});
+    const warnSpy = jest
+      .spyOn((service as any).logger, 'warn')
+      .mockImplementation(() => {});
 
     // Start first cycle (does not complete yet)
     const firstCycle = service.runCycle();
@@ -202,7 +362,9 @@ describe('RunDispatchService', () => {
     // Second cycle fires while first is still running
     await service.runCycle();
 
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('previous cycle'));
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('previous cycle'),
+    );
 
     // Finish first cycle
     resolveFirst!();
@@ -217,12 +379,16 @@ describe('RunDispatchService', () => {
     await service.runCycle(); // should not throw — error swallowed inside try/finally
 
     // isRunning must be false — next cycle should not be skipped
-    const warnSpy = jest.spyOn((service as any).logger, 'warn').mockImplementation(() => {});
+    const warnSpy = jest
+      .spyOn((service as any).logger, 'warn')
+      .mockImplementation(() => {});
     databaseScanService.getEligibleDatabases.mockResolvedValueOnce([]);
 
     await service.runCycle();
 
-    expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining('previous cycle'));
+    expect(warnSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining('previous cycle'),
+    );
   });
 
   it('(CONN-06) a failing DB does not prevent other DBs from being processed', async () => {
@@ -230,12 +396,16 @@ describe('RunDispatchService', () => {
     const failingDbName = 'bad-db';
     const goodDbName = 'good-db';
 
-    databaseScanService.getEligibleDatabases.mockResolvedValue([failingDbName, goodDbName]);
+    databaseScanService.getEligibleDatabases.mockResolvedValue([
+      failingDbName,
+      goodDbName,
+    ]);
     mongoService.db.mockImplementation((name: string) => {
       if (name === failingDbName) throw new Error('connection refused');
       return goodDb as unknown as Db;
     });
     jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
 
     await expect(service.runCycle()).resolves.not.toThrow();
     expect(webhookDispatchService.dispatch).toHaveBeenCalledTimes(1);
@@ -244,17 +414,25 @@ describe('RunDispatchService', () => {
 
   it('(CONN-06) cycle log includes DB count and error count after allSettled', async () => {
     const goodDb = makeDb(withinWindowVars, webhooksDoc, []);
-    databaseScanService.getEligibleDatabases.mockResolvedValue(['db-a', 'db-b']);
+    databaseScanService.getEligibleDatabases.mockResolvedValue([
+      'db-a',
+      'db-b',
+    ]);
     mongoService.db.mockImplementation((name: string) => {
       if (name === 'db-b') throw new Error('oops');
       return goodDb as unknown as Db;
     });
     jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
-    const logSpy = jest.spyOn((service as any).logger, 'log').mockImplementation(() => {});
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+    const logSpy = jest
+      .spyOn((service as any).logger, 'log')
+      .mockImplementation(() => {});
 
     await service.runCycle();
 
-    expect(logSpy).toHaveBeenCalledWith(expect.stringMatching(/2 DBs.*1 errors/));
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/2 DBs.*1 errors/),
+    );
     jest.restoreAllMocks();
   });
 });
