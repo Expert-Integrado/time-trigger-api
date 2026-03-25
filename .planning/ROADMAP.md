@@ -44,7 +44,12 @@ Plans:
   3. After a successful dispatch, the run transitions atomically to `runStatus: "queued"` with `queuedAt` set — a second concurrent cycle cannot dispatch the same run
   4. Runs outside the `morningLimit`–`nightLimit` window are skipped without being dispatched
   5. A failed dispatch retries once after 1 minute; if the retry also fails the run stays as `waiting` and is picked up in the next cycle
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — WebhookDispatchService: HTTP POST dispatch, atomic run claim, single non-blocking retry, 10s fetch timeout
+- [ ] 02-02-PLAN.md — RunDispatchService + DispatchModule: cycle guard, fresh config reads, time gate, run detection
+- [ ] 02-03-PLAN.md — SchedulerService + SchedulerModule: dynamic interval via SchedulerRegistry, AppModule wiring
 
 ### Phase 3: Operational Hardening
 **Goal**: The service processes all eligible databases in parallel, exposes a health endpoint for monitoring, and runs correctly inside a Docker container with UTC time enforcement
@@ -64,5 +69,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete   | 2026-03-25 |
-| 2. Core Dispatch Loop | 0/TBD | Not started | - |
+| 2. Core Dispatch Loop | 0/3 | Not started | - |
 | 3. Operational Hardening | 0/TBD | Not started | - |
