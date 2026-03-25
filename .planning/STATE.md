@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 02-core-dispatch-loop-02-01-PLAN.md
-last_updated: "2026-03-25T16:03:09.957Z"
+stopped_at: Completed 02-core-dispatch-loop-02-02-PLAN.md
+last_updated: "2026-03-25T16:08:01.150Z"
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 6
-  completed_plans: 4
+  completed_plans: 5
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 02 (core-dispatch-loop) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -50,6 +50,7 @@ Plan: 2 of 3
 | Phase 01-foundation P02 | 2min | 2 tasks | 4 files |
 | Phase 01-foundation P03 | 3min | 2 tasks | 4 files |
 | Phase 02-core-dispatch-loop P01 | 2min | 1 tasks | 2 files |
+| Phase 02-core-dispatch-loop P02 | 3min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,8 @@ Recent decisions affecting current work:
 - [Phase 02-core-dispatch-loop]: WebhookDispatchService uses Node 22 global fetch with AbortSignal.timeout(10_000) — no axios needed
 - [Phase 02-core-dispatch-loop]: dispatch() accepts db:Db as method param (not injected) — RunDispatchService holds the Db handle
 - [Phase 02-core-dispatch-loop]: Jest 30 requires jest.spyOn(global, 'setTimeout') alongside jest.useFakeTimers() for setTimeout assertions
+- [Phase 02-core-dispatch-loop]: DatabaseModule imported explicitly in DispatchModule (lacks @Global decorator — auto-resolution would fail at runtime)
+- [Phase 02-core-dispatch-loop]: isRunning guard uses try/finally reset in RunDispatchService — flag cleared even on error
 
 ### Pending Todos
 
@@ -85,6 +88,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T16:03:09.951Z
-Stopped at: Completed 02-core-dispatch-loop-02-01-PLAN.md
+Last session: 2026-03-25T16:08:01.144Z
+Stopped at: Completed 02-core-dispatch-loop-02-02-PLAN.md
 Resume file: None

@@ -48,7 +48,7 @@ Plans:
 
 Plans:
 - [x] 02-01-PLAN.md — WebhookDispatchService: HTTP POST dispatch, atomic run claim, single non-blocking retry, 10s fetch timeout
-- [ ] 02-02-PLAN.md — RunDispatchService + DispatchModule: cycle guard, fresh config reads, time gate, run detection
+- [x] 02-02-PLAN.md — RunDispatchService + DispatchModule: cycle guard, fresh config reads, time gate, run detection
 - [ ] 02-03-PLAN.md — SchedulerService + SchedulerModule: dynamic interval via SchedulerRegistry, AppModule wiring
 
 ### Phase 3: Operational Hardening
@@ -69,5 +69,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete   | 2026-03-25 |
-| 2. Core Dispatch Loop | 1/3 | In Progress|  |
+| 2. Core Dispatch Loop | 2/3 | In Progress|  |
 | 3. Operational Hardening | 0/TBD | Not started | - |

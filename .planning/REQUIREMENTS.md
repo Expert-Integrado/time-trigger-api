@@ -24,10 +24,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Run Detection
 
-- [ ] **DETECT-01**: Each cycle queries `runs` collection for documents with `runStatus: "waiting"` AND `waitUntil <= Date.now()`
-- [ ] **DETECT-02**: Each cycle re-reads `vars` collection fresh (no caching — configs change externally)
-- [ ] **DETECT-03**: Each cycle re-reads `webhooks` collection fresh (no caching — configs change externally)
-- [ ] **DETECT-04**: Runs are skipped if current hour is before `morningLimit` or after `nightLimit` from `vars`
+- [x] **DETECT-01**: Each cycle queries `runs` collection for documents with `runStatus: "waiting"` AND `waitUntil <= Date.now()`
+- [x] **DETECT-02**: Each cycle re-reads `vars` collection fresh (no caching — configs change externally)
+- [x] **DETECT-03**: Each cycle re-reads `webhooks` collection fresh (no caching — configs change externally)
+- [x] **DETECT-04**: Runs are skipped if current hour is before `morningLimit` or after `nightLimit` from `vars`
 
 ### Webhook Dispatch
 
@@ -90,10 +90,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SCHED-01 | Phase 2 | Pending |
 | SCHED-02 | Phase 2 | Pending |
 | SCHED-03 | Phase 2 | Pending |
-| DETECT-01 | Phase 2 | Pending |
-| DETECT-02 | Phase 2 | Pending |
-| DETECT-03 | Phase 2 | Pending |
-| DETECT-04 | Phase 2 | Pending |
+| DETECT-01 | Phase 2 | Complete |
+| DETECT-02 | Phase 2 | Complete |
+| DETECT-03 | Phase 2 | Complete |
+| DETECT-04 | Phase 2 | Complete |
 | DISP-01 | Phase 2 | Complete |
 | DISP-02 | Phase 2 | Complete |
 | DISP-03 | Phase 2 | Complete |
