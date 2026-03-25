@@ -81,34 +81,34 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CONN-01 | Pending | Pending |
-| CONN-02 | Pending | Pending |
-| CONN-03 | Pending | Pending |
-| CONN-04 | Pending | Pending |
-| CONN-05 | Pending | Pending |
-| CONN-06 | Pending | Pending |
-| SCHED-01 | Pending | Pending |
-| SCHED-02 | Pending | Pending |
-| SCHED-03 | Pending | Pending |
-| DETECT-01 | Pending | Pending |
-| DETECT-02 | Pending | Pending |
-| DETECT-03 | Pending | Pending |
-| DETECT-04 | Pending | Pending |
-| DISP-01 | Pending | Pending |
-| DISP-02 | Pending | Pending |
-| DISP-03 | Pending | Pending |
-| DISP-04 | Pending | Pending |
-| DISP-05 | Pending | Pending |
-| DISP-06 | Pending | Pending |
-| OPS-01 | Pending | Pending |
-| OPS-02 | Pending | Pending |
-| OPS-03 | Pending | Pending |
+| CONN-01 | Phase 1 | Pending |
+| CONN-02 | Phase 1 | Pending |
+| CONN-03 | Phase 1 | Pending |
+| CONN-04 | Phase 1 | Pending |
+| CONN-05 | Phase 1 | Pending |
+| CONN-06 | Phase 3 | Pending |
+| SCHED-01 | Phase 2 | Pending |
+| SCHED-02 | Phase 2 | Pending |
+| SCHED-03 | Phase 2 | Pending |
+| DETECT-01 | Phase 2 | Pending |
+| DETECT-02 | Phase 2 | Pending |
+| DETECT-03 | Phase 2 | Pending |
+| DETECT-04 | Phase 2 | Pending |
+| DISP-01 | Phase 2 | Pending |
+| DISP-02 | Phase 2 | Pending |
+| DISP-03 | Phase 2 | Pending |
+| DISP-04 | Phase 2 | Pending |
+| DISP-05 | Phase 2 | Pending |
+| DISP-06 | Phase 2 | Pending |
+| OPS-01 | Phase 3 | Pending |
+| OPS-02 | Phase 1 | Pending |
+| OPS-03 | Phase 3 | Pending |
 
 **Coverage:**
 - v1 requirements: 22 total
-- Mapped to phases: 0
-- Unmapped: 22 ⚠️
+- Mapped to phases: 22
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-25*
-*Last updated: 2026-03-25 after initial definition*
+*Last updated: 2026-03-25 after roadmap creation*
