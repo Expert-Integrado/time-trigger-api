@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Per-Client Controls
-status: Phase complete — ready for verification
+status: Milestone complete
 stopped_at: "Completed 05-01-PLAN.md: timeTrigger per-client controls in RunDispatchService"
-last_updated: "2026-03-25T18:04:36.006Z"
+last_updated: "2026-03-25T18:07:52.725Z"
 progress:
   total_phases: 2
   completed_phases: 2
@@ -23,8 +23,8 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 
 ## Current Position
 
-Phase: 05 (per-client-time-controls) — EXECUTING
-Plan: 1 of 1
+Phase: 05
+Plan: Not started
 
 ## Performance Metrics
 
