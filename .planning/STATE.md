@@ -4,8 +4,8 @@ milestone: v1.1
 milestone_name: Per-Client Controls
 status: planning
 stopped_at: "Completed 04-01-PLAN.md: TARGET_DATABASES filter in DatabaseScanService"
-last_updated: "2026-03-25T17:49:58.752Z"
-last_activity: 2026-03-25 — v1.1 roadmap created, ready to plan Phase 4
+last_updated: "2026-03-25T17:54:21.704Z"
+last_activity: 2026-03-25
 progress:
   total_phases: 2
   completed_phases: 1
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 
 ## Current Position
 
-Phase: 04 of 05 (Database Targeting)
+Phase: 5 of 05 (per client time controls)
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-03-25 — v1.1 roadmap created, ready to plan Phase 4
+Last activity: 2026-03-25
 
 Progress: [██████░░░░] 60% (3/5 phases complete)
 
