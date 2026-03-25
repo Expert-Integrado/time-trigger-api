@@ -52,14 +52,19 @@ Plans:
 - [x] 02-03-PLAN.md — SchedulerService + SchedulerModule: dynamic interval via SchedulerRegistry, AppModule wiring
 
 ### Phase 3: Operational Hardening
-**Goal**: The service processes all eligible databases in parallel, exposes a health endpoint for monitoring, and runs correctly inside a Docker container with UTC time enforcement
+**Goal**: The service processes all eligible databases in parallel, exposes a health endpoint for monitoring, and runs correctly inside a Docker container with TZ=America/Sao_Paulo enforced
 **Depends on**: Phase 2
 **Requirements**: CONN-06, OPS-01, OPS-03
 **Success Criteria** (what must be TRUE):
   1. A slow or failing database does not block other databases from being processed in the same cycle
-  2. `GET /health` returns 200 with the timestamp of the last cycle, number of databases scanned, runs dispatched, and any errors
-  3. The service runs inside a Docker container and dispatches runs correctly against a real MongoDB replica set with `TZ=UTC` enforced
-**Plans**: TBD
+  2. `GET /health` returns 200 with `{ status: 'ok', uptime: <seconds> }` — sufficient for Docker HEALTHCHECK
+  3. The service runs inside a Docker container with `TZ=America/Sao_Paulo` enforced
+**Plans**: 3 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Refactor RunDispatchService.runCycle() from for-of to Promise.allSettled; add CONN-06 parallel isolation tests
+- [ ] 03-02-PLAN.md — Create HealthController + HealthModule (GET /health), wire into AppModule
+- [ ] 03-03-PLAN.md — Dockerfile (multi-stage node:22-slim), .dockerignore, docker-compose.yml, GitHub Actions workflow (ghcr.io)
 
 ## Progress
 
@@ -70,4 +75,4 @@ Phases execute in numeric order: 1 → 2 → 3
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete   | 2026-03-25 |
 | 2. Core Dispatch Loop | 2/3 | In Progress|  |
-| 3. Operational Hardening | 0/TBD | Not started | - |
+| 3. Operational Hardening | 0/3 | Not started | - |
