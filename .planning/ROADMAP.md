@@ -27,7 +27,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Service connects to the MongoDB replica set and logs the full list of discovered databases on startup
   3. Service logs which databases were accepted (have `runs`, `webhooks`, and `vars` collections) and which were skipped
   4. All connection and discovery activity produces structured log lines (cycle start, DB scan results, errors)
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Install deps, wire ConfigModule globally, extract validateEnv(), prove fail-fast with unit tests
+- [ ] 01-02-PLAN.md — Build MongoService singleton (connect, listDatabaseNames, db()) and MongoModule; wire into AppModule
+- [ ] 01-03-PLAN.md — Build DatabaseScanService (collection-presence filter, structured log), DatabaseModule, startup scan hook in AppModule
 
 ### Phase 2: Core Dispatch Loop
 **Goal**: The service reliably detects waiting runs and dispatches them to webhooks — with no duplicate dispatches, no overlapping cycles, correct time-of-day gating, and a single retry on failure
@@ -58,6 +63,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/TBD | Not started | - |
+| 1. Foundation | 0/3 | Planned | - |
 | 2. Core Dispatch Loop | 0/TBD | Not started | - |
 | 3. Operational Hardening | 0/TBD | Not started | - |
