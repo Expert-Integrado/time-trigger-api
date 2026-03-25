@@ -4,6 +4,7 @@ import { DatabaseModule } from './database/database.module.js';
 import { DatabaseScanService } from './database/database-scan.service.js';
 import { MongoModule } from './mongo/mongo.module.js';
 import { SchedulerModule } from './scheduler/scheduler.module.js';
+import { HealthModule } from './health/health.module.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 
@@ -13,6 +14,7 @@ import { AppService } from './app.service.js';
     MongoModule,
     DatabaseModule,
     SchedulerModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
