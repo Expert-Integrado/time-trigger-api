@@ -88,10 +88,10 @@ Plans:
   3. Runs are only dispatched within the window defined by `timeTrigger.morningLimit` and `timeTrigger.nightLimit` (root-level fields are not read)
   4. Runs are only dispatched on days present in `timeTrigger.allowedDays`; runs on excluded days are skipped and remain `waiting`
   5. Schema for the `timeTrigger` object is documented in `docs/vars-schema.md`
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 05-01: TBD
+- [ ] 05-01-PLAN.md — Refatorar processDatabase() para usar timeTrigger (enabled, morningLimit, nightLimit, allowedDays); testes TDD cobrindo TRIG-01 a TRIG-06
 
 ## Progress
 
@@ -104,4 +104,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Core Dispatch Loop | v1.0 | 3/3 | Complete | 2026-03-25 |
 | 3. Operational Hardening | v1.0 | 3/3 | Complete | 2026-03-25 |
 | 4. Database Targeting | v1.1 | 1/1 | Complete   | 2026-03-25 |
-| 5. Per-Client Time Controls | v1.1 | 0/? | Not started | - |
+| 5. Per-Client Time Controls | v1.1 | 0/1 | Not started | - |
