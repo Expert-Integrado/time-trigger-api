@@ -31,12 +31,12 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Webhook Dispatch
 
-- [ ] **DISP-01**: Eligible run document is POSTed as JSON to the "Processador de Runs" URL from `webhooks` collection
-- [ ] **DISP-02**: On successful POST, run is updated atomically via `findOneAndUpdate` to `runStatus: "queued"` with `queuedAt` set to current timestamp
-- [ ] **DISP-03**: Atomic update uses `{runStatus: "waiting"}` as filter condition to prevent duplicate dispatch
-- [ ] **DISP-04**: On failed POST, system retries once after 1 minute delay
-- [ ] **DISP-05**: If retry also fails, run remains as `runStatus: "waiting"` (picked up in next cycle)
-- [ ] **DISP-06**: HTTP requests have explicit timeout to prevent hanging webhook from blocking the cycle
+- [x] **DISP-01**: Eligible run document is POSTed as JSON to the "Processador de Runs" URL from `webhooks` collection
+- [x] **DISP-02**: On successful POST, run is updated atomically via `findOneAndUpdate` to `runStatus: "queued"` with `queuedAt` set to current timestamp
+- [x] **DISP-03**: Atomic update uses `{runStatus: "waiting"}` as filter condition to prevent duplicate dispatch
+- [x] **DISP-04**: On failed POST, system retries once after 1 minute delay
+- [x] **DISP-05**: If retry also fails, run remains as `runStatus: "waiting"` (picked up in next cycle)
+- [x] **DISP-06**: HTTP requests have explicit timeout to prevent hanging webhook from blocking the cycle
 
 ### Operational
 
@@ -94,12 +94,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DETECT-02 | Phase 2 | Pending |
 | DETECT-03 | Phase 2 | Pending |
 | DETECT-04 | Phase 2 | Pending |
-| DISP-01 | Phase 2 | Pending |
-| DISP-02 | Phase 2 | Pending |
-| DISP-03 | Phase 2 | Pending |
-| DISP-04 | Phase 2 | Pending |
-| DISP-05 | Phase 2 | Pending |
-| DISP-06 | Phase 2 | Pending |
+| DISP-01 | Phase 2 | Complete |
+| DISP-02 | Phase 2 | Complete |
+| DISP-03 | Phase 2 | Complete |
+| DISP-04 | Phase 2 | Complete |
+| DISP-05 | Phase 2 | Complete |
+| DISP-06 | Phase 2 | Complete |
 | OPS-01 | Phase 3 | Pending |
 | OPS-02 | Phase 1 | Complete |
 | OPS-03 | Phase 3 | Pending |

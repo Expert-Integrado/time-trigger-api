@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Completed 01-foundation-01-03-PLAN.md
-last_updated: "2026-03-25T15:38:36.170Z"
+status: Ready to execute
+stopped_at: Completed 02-core-dispatch-loop-02-01-PLAN.md
+last_updated: "2026-03-25T16:03:09.957Z"
 progress:
   total_phases: 3
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 6
+  completed_plans: 4
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Runs with `runStatus: "waiting"` must be detected and dispatched to their webhook reliably — no missed runs, no duplicate dispatches.
-**Current focus:** Phase 01 — foundation
+**Current focus:** Phase 02 — core-dispatch-loop
 
 ## Current Position
 
-Phase: 2
-Plan: Not started
+Phase: 02 (core-dispatch-loop) — EXECUTING
+Plan: 2 of 3
 
 ## Performance Metrics
 
@@ -49,6 +49,7 @@ Plan: Not started
 | Phase 01-foundation P01 | 3 | 2 tasks | 5 files |
 | Phase 01-foundation P02 | 2min | 2 tasks | 4 files |
 | Phase 01-foundation P03 | 3min | 2 tasks | 4 files |
+| Phase 02-core-dispatch-loop P01 | 2min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -68,6 +69,9 @@ Recent decisions affecting current work:
 - [Phase 01-foundation]: @Global() on MongoModule follows same pattern as ConfigModule isGlobal:true — registered once in AppModule, available project-wide without re-importing
 - [Phase 01-foundation]: DatabaseModule uses @Global() MongoModule — no re-import needed in feature modules
 - [Phase 01-foundation]: Startup scan in onApplicationBootstrap guarantees MongoDB connection established before scanning
+- [Phase 02-core-dispatch-loop]: WebhookDispatchService uses Node 22 global fetch with AbortSignal.timeout(10_000) — no axios needed
+- [Phase 02-core-dispatch-loop]: dispatch() accepts db:Db as method param (not injected) — RunDispatchService holds the Db handle
+- [Phase 02-core-dispatch-loop]: Jest 30 requires jest.spyOn(global, 'setTimeout') alongside jest.useFakeTimers() for setTimeout assertions
 
 ### Pending Todos
 
@@ -81,6 +85,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T15:34:01.938Z
-Stopped at: Completed 01-foundation-01-03-PLAN.md
+Last session: 2026-03-25T16:03:09.951Z
+Stopped at: Completed 02-core-dispatch-loop-02-01-PLAN.md
 Resume file: None
