@@ -150,7 +150,12 @@ Plans:
   3. A slow or hung runs cycle does not delay or block FUP or messages cycles — each has its own `isRunning` guard that only prevents overlap within that same dispatch type
   4. `.env.example` documents `CRON_INTERVAL_RUNS`, `CRON_INTERVAL_FUP`, and `CRON_INTERVAL_MESSAGES` with no reference to the old `CRON_INTERVAL`
   5. `docs/vars-schema.md` reflects the new env vars
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 08-01-PLAN.md — Split RunDispatchService.runCycle() into runRunsCycle(), runFupCycle(), runMessagesCycle() with independent isRunning guards; TDD cobrindo CRON-06/07
+- [ ] 08-02-PLAN.md — Refatorar SchedulerService: 3 setIntervals independentes com CRON_INTERVAL_RUNS/FUP/MESSAGES; TDD cobrindo CRON-01 a CRON-05/07
+- [ ] 08-03-PLAN.md — Atualizar validateEnv() (main.ts), main.spec.ts, .env.example e docs/vars-schema.md; cobre CRON-08/09/10/11
 
 ## Progress
 
@@ -166,4 +171,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5. Per-Client Time Controls | v1.1 | 1/1 | Complete | 2026-03-25 |
 | 6. FUP Dispatch | v1.2 | 1/1 | Complete | 2026-03-26 |
 | 7. Messages Dispatch | v1.3 | 1/1 | Complete | 2026-03-26 |
-| 8. Independent Cron Intervals | v1.4 | 0/? | Not started | - |
+| 8. Independent Cron Intervals | v1.4 | 0/3 | Not started | - |
