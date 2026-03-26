@@ -113,14 +113,42 @@ Campos que devem existir na coleção `vars` de cada banco para o Time Trigger f
 
 ## Webhooks Necessários
 
-A coleção `webhooks` de cada banco precisa ter estes campos:
+A coleção `webhooks` de cada banco precisa ter um documento com a seguinte estrutura:
 
-| Campo | Descrição |
-|-------|-----------|
-| `"Processador de Runs"` | URL para dispatch de runs |
-| `"Gerenciador follow up"` | URL para dispatch de FUPs |
+### Campos usados pelo Time Trigger API
 
-Se algum webhook estiver ausente, o dispatch correspondente é pulado (com log de warning), mas o outro continua funcionando.
+| Campo | Obrigatório | Descrição |
+|-------|-------------|-----------|
+| `"botIdentifier"` | Sim | Identificador do bot/cliente |
+| `"Processador de Runs"` | Sim* | URL para dispatch de runs |
+| `"Gerenciador follow up"` | Sim* | URL para dispatch de FUPs |
+
+\* Se ausente, o dispatch correspondente é pulado (com log de warning), mas o outro continua funcionando.
+
+### Exemplo completo do documento webhooks
+
+```json
+{
+  "botIdentifier": "sdrEdunations",
+  "Ação na plataforma de origem": "https://webhook-edunations.hostexpert.com.br/webhook/ExecutaAcaoPlataforma",
+  "Chat": "https://webhook-edunations.hostexpert.com.br/webhook/ChatObject",
+  "Processa mensagem": "https://webhook-edunations.hostexpert.com.br/webhook/ProcessaMensagem",
+  "FUP": "https://webhook-edunations.hostexpert.com.br/webhook/FollowUp",
+  "Analisador de perfil": "https://webhook-edunations.hostexpert.com.br/webhook/AnalisadorPerfil",
+  "Processador de Runs": "https://webhook-edunations.hostexpert.com.br/webhook/processadorDeRuns",
+  "Gerenciador follow up": "https://webhook-edunations.hostexpert.com.br/webhook/GerenciadorFollowup",
+  "Function Calling": "https://webhook-edunations.hostexpert.com.br/webhook/FunctionCalling",
+  "Thread Analyzer": "https://webhook-edunations.hostexpert.com.br/webhook/ThreadAnalyser",
+  "Agendador de lembretes": "https://webhook-edunations.hostexpert.com.br/webhook/AgendadorLembretes",
+  "Mensagem programada": "https://webhook-edunations.hostexpert.com.br/webhook/MensagemProgramada",
+  "getAvailableTimes": "https://webhook-edunations.hostexpert.com.br/webhook/getAvailableTimes",
+  "scheduleMeeting": "https://webhook-edunations.hostexpert.com.br/webhook/scheduleMeeting",
+  "rescheduleMeeting": "https://webhook-edunations.hostexpert.com.br/webhook/rescheduleMeeting",
+  "evaluateLead": "https://webhook-edunations.hostexpert.com.br/webhook/evaluate_lead"
+}
+```
+
+> **Nota:** O Time Trigger API só lê `"Processador de Runs"` e `"Gerenciador follow up"`. Os demais campos são usados por outros sistemas.
 
 ## Env Var: TARGET_DATABASES
 
