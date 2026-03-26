@@ -37,20 +37,20 @@ Requirements for FUP Dispatch milestone.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FUP-01 | Pending | Pending |
-| FUP-02 | Pending | Pending |
-| FUP-03 | Pending | Pending |
-| FUP-04 | Pending | Pending |
-| FUP-05 | Pending | Pending |
-| FUP-06 | Pending | Pending |
-| FUP-07 | Pending | Pending |
-| FUP-08 | Pending | Pending |
-| FUP-09 | Pending | Pending |
+| FUP-01 | Phase 6 | Pending |
+| FUP-02 | Phase 6 | Pending |
+| FUP-03 | Phase 6 | Pending |
+| FUP-04 | Phase 6 | Pending |
+| FUP-05 | Phase 6 | Pending |
+| FUP-06 | Phase 6 | Pending |
+| FUP-07 | Phase 6 | Pending |
+| FUP-08 | Phase 6 | Pending |
+| FUP-09 | Phase 6 | Pending |
 
 **Coverage:**
 - v1.2 requirements: 9 total
-- Mapped to phases: 0
-- Unmapped: 9 ⚠️
+- Mapped to phases: 9
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-26*

@@ -2,33 +2,39 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: FUP Dispatch
-status: Defining requirements
-stopped_at: "Completed 05-01-PLAN.md: timeTrigger per-client controls in RunDispatchService"
-last_updated: "2026-03-25T18:07:52.725Z"
+status: Roadmap ready
+stopped_at: "Roadmap created for v1.2 — Phase 6 defined, ready for plan-phase"
+last_updated: "2026-03-26T00:00:00.000Z"
 progress:
-  total_phases: 2
-  completed_phases: 2
-  total_plans: 2
-  completed_plans: 2
+  total_phases: 1
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-25)
+See: .planning/PROJECT.md (updated 2026-03-26)
 
-**Core value:** Runs with `runStatus: "waiting"` must be detected and dispatched to their webhook reliably — no missed runs, no duplicate dispatches.
-**Current focus:** Phase 05 — per-client-time-controls
+**Core value:** Runs and FUPs with the right status must be detected and dispatched to their webhooks reliably — no missed dispatches, no duplicates.
+**Current focus:** Phase 06 — fup-dispatch
 
 ## Current Position
 
-Phase: 05
+Phase: 06
 Plan: Not started
+Status: Not started
+
+```
+v1.2 Progress: [          ] 0%
+Phase 6: [ ] FUP Dispatch
+```
 
 ## Performance Metrics
 
-**Velocity:**
+**Velocity (inherited from v1.0/v1.1):**
 
 - Total plans completed: 9
 - Average duration: ~2.5 min
@@ -41,15 +47,10 @@ Plan: Not started
 | 01-foundation | 3 | ~10 min | ~3 min |
 | 02-core-dispatch-loop | 3 | ~8 min | ~2.7 min |
 | 03-operational-hardening | 3 | ~5 min | ~1.7 min |
-
-**Recent Trend:**
-
-- Last 5 plans: 3, 2, 3, 1, 3 min
-- Trend: Stable
+| 04-database-targeting | 1 | ~10 min | ~10 min |
+| 05-per-client-time-controls | 1 | ~2 min | ~2 min |
 
 *Updated after each plan completion*
-| Phase 04 P01 | 10 | 1 tasks | 2 files |
-| Phase 05-per-client-time-controls P01 | 2 | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -66,12 +67,13 @@ Recent decisions affecting current work:
 - [Phase 01]: @Global() on MongoModule — registered once in AppModule, available project-wide
 - [Phase 04]: TARGET_DATABASES filter applied before listCollections loop — db() never called for excluded databases (FILT-03)
 - [Phase 04]: ConfigService injection over process.env for proper NestJS DI and testability
-- [Phase 05-per-client-time-controls]: timeTrigger absence = warn + skip pattern; verification order: enabled -> time -> day -> webhooks -> runs
-- [Phase 05-per-client-time-controls]: isAllowedDay uses TZ=America/Sao_Paulo convention via new Date().getDay() — same as isWithinTimeWindow
+- [Phase 05]: timeTrigger absence = warn + skip pattern; verification order: enabled -> time -> day -> webhooks -> runs
+- [Phase 05]: isAllowedDay uses TZ=America/Sao_Paulo convention via new Date().getDay() — same as isWithinTimeWindow
+- [Phase 06 roadmap]: FUP dispatch lives inside processDatabase() — no new module or cron needed; mirrors runs dispatch pattern
 
 ### Pending Todos
 
-None yet.
+None.
 
 ### Quick Tasks Completed
 
@@ -81,11 +83,10 @@ None yet.
 
 ### Blockers/Concerns
 
-- `timeTrigger` field path in real client `vars` documents — confirm structure before implementing TRIG-01 through TRIG-06
-- Timezone handling for `morningLimit`/`nightLimit` in `timeTrigger` — same `TZ=America/Sao_Paulo` convention as root-level fields?
+- Confirm `fup` collection is present in all client databases that have `runs` — or whether the collection filter in Phase 1 needs updating to also check for `fup`
 
 ## Session Continuity
 
-Last session: 2026-03-25
-Stopped at: 2026-03-25 - Completed quick task 260325-lb7: Create CI workflow with lint, test, and build on push/PR to main
+Last session: 2026-03-26
+Stopped at: 2026-03-26 - v1.2 roadmap created, Phase 6 defined
 Resume file: None

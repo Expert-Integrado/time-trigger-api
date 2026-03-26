@@ -3,7 +3,8 @@
 ## Milestones
 
 - ✅ **v1.0 MVP** - Phases 1-3 (shipped 2026-03-25)
-- 🚧 **v1.1 Per-Client Controls** - Phases 4-5 (in progress)
+- ✅ **v1.1 Per-Client Controls** - Phases 4-5 (shipped 2026-03-25)
+- 🚧 **v1.2 FUP Dispatch** - Phase 6 (in progress)
 
 ## Phases
 
@@ -60,11 +61,10 @@ Plans:
 
 </details>
 
-### 🚧 v1.1 Per-Client Controls (In Progress)
+<details>
+<summary>✅ v1.1 Per-Client Controls (Phases 4-5) - SHIPPED 2026-03-25</summary>
 
-**Milestone Goal:** Granular per-client control — operators can restrict which databases the service processes via `TARGET_DATABASES` env var, and each client database can independently enable/disable Time Trigger and configure its own time-of-day and day-of-week constraints via a `timeTrigger` object in the `vars` collection.
-
-#### Phase 4: Database Targeting
+### Phase 4: Database Targeting
 **Goal**: Operators can limit which client databases are processed by specifying a list in `TARGET_DATABASES`, without changing any code — unlisted databases are skipped before any collection checks or dispatch logic runs
 **Depends on**: Phase 3
 **Requirements**: FILT-01, FILT-02, FILT-03
@@ -78,7 +78,7 @@ Plans:
 Plans:
 - [x] 04-01-PLAN.md — Injetar ConfigService em DatabaseScanService, aplicar filtro TARGET_DATABASES antes do loop de coleções, testes TDD
 
-#### Phase 5: Per-Client Time Controls
+### Phase 5: Per-Client Time Controls
 **Goal**: Each client database controls whether Time Trigger runs at all, and during which hours and days, via a `timeTrigger` object in its `vars` document — replacing the old root-level fields with a dedicated, structured config
 **Depends on**: Phase 4
 **Requirements**: TRIG-01, TRIG-02, TRIG-03, TRIG-04, TRIG-05, TRIG-06
@@ -93,15 +93,34 @@ Plans:
 Plans:
 - [x] 05-01-PLAN.md — Refatorar processDatabase() para usar timeTrigger (enabled, morningLimit, nightLimit, allowedDays); testes TDD cobrindo TRIG-01 a TRIG-06
 
+</details>
+
+### 🚧 v1.2 FUP Dispatch (In Progress)
+
+**Milestone Goal:** Add follow-up (FUP) dispatch alongside existing runs dispatch — same cron cycle, same time and day gates, different collection (`fup`) and webhook URL ("FUP"). No duplicate dispatches; atomic claim; single retry on failure.
+
+#### Phase 6: FUP Dispatch
+**Goal**: Each cron cycle also processes the `fup` collection, detecting eligible FUP documents and dispatching them to the FUP webhook — atomically preventing duplicates, with a single retry on failure, reusing the same time and day gates already applied to runs
+**Depends on**: Phase 5
+**Requirements**: FUP-01, FUP-02, FUP-03, FUP-04, FUP-05, FUP-06, FUP-07, FUP-08, FUP-09
+**Success Criteria** (what must be TRUE):
+  1. Each cycle queries the `fup` collection for documents where `status: "on"` AND `nextInteractionTimestamp <= Date.now()` — only those documents are eligible for dispatch
+  2. Eligible FUP documents are skipped (not dispatched) when the current time is outside `timeTrigger.morningLimit`/`nightLimit` or outside `timeTrigger.allowedDays` — the same gates used for runs
+  3. An eligible FUP document is POSTed to the "FUP" webhook URL read from the `webhooks` collection; on success, `status` is updated atomically to `"queued"` via `findOneAndUpdate` with `{ status: "on" }` as the filter — concurrent cycles cannot dispatch the same FUP twice
+  4. A failed FUP POST retries once after 1 minute; if the retry also fails, the document remains as `status: "on"` and is picked up in the next cycle
+  5. FUP dispatch runs inside `processDatabase()` — same call path as runs, no separate cron or module required
+**Plans**: TBD
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1. Foundation | v1.0 | 3/3 | Complete | 2026-03-25 |
 | 2. Core Dispatch Loop | v1.0 | 3/3 | Complete | 2026-03-25 |
 | 3. Operational Hardening | v1.0 | 3/3 | Complete | 2026-03-25 |
-| 4. Database Targeting | v1.1 | 1/1 | Complete   | 2026-03-25 |
-| 5. Per-Client Time Controls | v1.1 | 1/1 | Complete   | 2026-03-25 |
+| 4. Database Targeting | v1.1 | 1/1 | Complete | 2026-03-25 |
+| 5. Per-Client Time Controls | v1.1 | 1/1 | Complete | 2026-03-25 |
+| 6. FUP Dispatch | v1.2 | 0/? | Not started | - |
