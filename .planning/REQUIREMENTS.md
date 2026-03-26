@@ -1,55 +1,56 @@
-# Requirements: Time Trigger API — Milestone v1.1
+# Requirements: Time Trigger API — Milestone v1.2
 
-**Defined:** 2026-03-25
-**Core Value:** Runs with `runStatus: "waiting"` must be detected and dispatched to their webhook reliably — no missed runs, no duplicate dispatches.
+**Defined:** 2026-03-26
+**Core Value:** Runs and FUPs must be detected and dispatched reliably — no missed dispatches, no duplicates.
 
-## v1.1 Requirements
+## v1.2 Requirements
 
-Requirements for Per-Client Controls milestone.
+Requirements for FUP Dispatch milestone.
 
-### Database Filtering
+### FUP Detection
 
-- [x] **FILT-01**: `TARGET_DATABASES` env var accepts `*` (all) or comma-separated list (e.g., `sdr-4blue,dev`)
-- [x] **FILT-02**: If `TARGET_DATABASES` is absent or `*`, all eligible databases are processed (current behavior preserved)
-- [x] **FILT-03**: If a list is specified, only databases in the list are processed (filter applied before collection check)
+- [ ] **FUP-01**: Each cycle queries `fup` collection for documents with `status: "on"` AND `nextInteractionTimestamp <= Date.now()`
+- [ ] **FUP-02**: FUP detection uses same `timeTrigger.morningLimit`/`nightLimit` time gate as runs
+- [ ] **FUP-03**: FUP detection uses same `timeTrigger.allowedDays` day-of-week gate as runs
 
-### Time Trigger Config
+### FUP Dispatch
 
-- [x] **TRIG-01**: Reads `timeTrigger` object from each database's `vars` document
-- [x] **TRIG-02**: If `timeTrigger` does not exist in vars, database is skipped (no runs processed)
-- [x] **TRIG-03**: If `timeTrigger.enabled` is `false`, database is skipped
-- [x] **TRIG-04**: Uses `timeTrigger.morningLimit` and `timeTrigger.nightLimit` for time-of-day gating (replaces root-level fields)
-- [x] **TRIG-05**: Uses `timeTrigger.allowedDays` array to filter by day of week (0=Sunday...6=Saturday)
-- [x] **TRIG-06**: Runs are skipped if current day of week is not in `allowedDays`
+- [ ] **FUP-04**: Eligible FUP document is POSTed as JSON to the "FUP" URL from `webhooks` collection
+- [ ] **FUP-05**: On successful POST, FUP is updated atomically via `findOneAndUpdate` to `status: "queued"`
+- [ ] **FUP-06**: Atomic update uses `{ status: "on" }` as filter condition to prevent duplicate dispatch
+- [ ] **FUP-07**: On failed POST, retries once after 1 minute delay
+- [ ] **FUP-08**: If retry also fails, FUP remains as `status: "on"` (picked up in next cycle)
+
+### Integration
+
+- [ ] **FUP-09**: FUP dispatch runs in the same cron cycle as runs dispatch (within `processDatabase()`)
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Per-run time config | timeTrigger is per-database (per-client), not per-run |
-| Admin API to modify vars | vars is managed externally (other systems) |
-| Fallback to root-level morningLimit/nightLimit | Clean break — new structure only |
-| Caching timeTrigger config | Re-read every cycle (existing design decision) |
+| Separate cron for FUP | Runs in same cycle as runs — simpler, same time gates |
+| FUP-specific time gates | Uses same timeTrigger as runs (morningLimit, nightLimit, allowedDays) |
+| FUP status management beyond queued | Downstream webhook handles lifecycle after queued |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FILT-01 | Phase 4 | Complete |
-| FILT-02 | Phase 4 | Complete |
-| FILT-03 | Phase 4 | Complete |
-| TRIG-01 | Phase 5 | Complete |
-| TRIG-02 | Phase 5 | Complete |
-| TRIG-03 | Phase 5 | Complete |
-| TRIG-04 | Phase 5 | Complete |
-| TRIG-05 | Phase 5 | Complete |
-| TRIG-06 | Phase 5 | Complete |
+| FUP-01 | Pending | Pending |
+| FUP-02 | Pending | Pending |
+| FUP-03 | Pending | Pending |
+| FUP-04 | Pending | Pending |
+| FUP-05 | Pending | Pending |
+| FUP-06 | Pending | Pending |
+| FUP-07 | Pending | Pending |
+| FUP-08 | Pending | Pending |
+| FUP-09 | Pending | Pending |
 
 **Coverage:**
-- v1.1 requirements: 9 total
-- Mapped to phases: 9
-- Unmapped: 0 ✓
+- v1.2 requirements: 9 total
+- Mapped to phases: 0
+- Unmapped: 9 ⚠️
 
 ---
-*Requirements defined: 2026-03-25*
-*Last updated: 2026-03-25 after roadmap creation*
+*Requirements defined: 2026-03-26*

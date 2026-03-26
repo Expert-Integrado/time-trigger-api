@@ -25,25 +25,27 @@ Runs with `runStatus: "waiting"` must be detected and dispatched to their webhoo
 - ✓ Retry once after 1 min, leaves as "waiting" if fails — Phase 2
 - ✓ HTTP timeout prevents hanging webhooks — Phase 2
 
-## Current Milestone: v1.1 Per-Client Controls
+## Current Milestone: v1.2 FUP Dispatch
 
-**Goal:** Granular per-client control via `timeTrigger` config in vars collection + database filtering via env var
+**Goal:** Add follow-up (FUP) dispatch alongside existing runs dispatch — same cycle, same time gates, different collection and webhook.
 
 **Target features:**
-- `TARGET_DATABASES` env var to filter which databases to process
-- Read `timeTrigger` config from vars (enabled, morningLimit, nightLimit, allowedDays)
-- Replace current root-level morningLimit/nightLimit with `timeTrigger.*` structure
-- Day-of-week filtering via allowedDays
-- Skip databases where `timeTrigger.enabled = false` or `timeTrigger` is missing
+- Query `fup` collection for documents with `status: "on"` and `nextInteractionTimestamp <= Date.now()`
+- POST FUP document to "FUP" webhook URL from webhooks collection
+- On success: update `status` to `"queued"` atomically
+- Retry 1x after 1 min, failure leaves as `status: "on"`
+- Uses same `timeTrigger` controls (morningLimit, nightLimit, allowedDays)
+- Runs in same cron cycle as runs dispatch
 
 ### Active
 
-- [ ] `TARGET_DATABASES` env var filters which databases to process (`*` = all, or comma-separated list)
-- [ ] Read `timeTrigger.enabled` from vars — skip database if false or missing
-- [ ] Read `timeTrigger.morningLimit` and `timeTrigger.nightLimit` from vars instead of root-level fields
-- [ ] Read `timeTrigger.allowedDays` from vars — skip runs if current day not in list
-- [ ] Refactor time gate logic to use new `timeTrigger.*` fields
-- [ ] Schema documented in `docs/vars-schema.md`
+- [ ] Query `fup` collection for `status: "on"` AND `nextInteractionTimestamp <= Date.now()`
+- [ ] Read "FUP" webhook URL from webhooks collection
+- [ ] POST FUP document to webhook URL
+- [ ] On success: atomic update `status: "queued"`
+- [ ] Retry once after 1 min, failure keeps `status: "on"`
+- [ ] Uses `timeTrigger.morningLimit`/`nightLimit` for time gate
+- [ ] Uses `timeTrigger.allowedDays` for day-of-week gate
 
 ### Out of Scope
 
@@ -100,4 +102,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-25 after milestone v1.1 started*
+*Last updated: 2026-03-26 after milestone v1.2 started*

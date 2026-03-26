@@ -1,8 +1,8 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Per-Client Controls
-status: Milestone complete
+milestone: v1.2
+milestone_name: FUP Dispatch
+status: Defining requirements
 stopped_at: "Completed 05-01-PLAN.md: timeTrigger per-client controls in RunDispatchService"
 last_updated: "2026-03-25T18:07:52.725Z"
 progress:
