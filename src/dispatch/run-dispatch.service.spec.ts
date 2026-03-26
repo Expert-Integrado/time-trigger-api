@@ -89,7 +89,7 @@ describe('RunDispatchService', () => {
 
   const webhooksDoc = {
     'Processador de Runs': 'https://hook.example.com',
-    FUP: 'https://fup.example.com',
+    'Gerenciador follow up': 'https://fup.example.com',
   };
 
   it('(DETECT-01) queries runs collection with runStatus:waiting and waitUntil <= now', async () => {
