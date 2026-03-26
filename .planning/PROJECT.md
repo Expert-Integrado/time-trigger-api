@@ -25,26 +25,26 @@ Runs with `runStatus: "waiting"` must be detected and dispatched to their webhoo
 - ✓ Retry once after 1 min, leaves as "waiting" if fails — Phase 2
 - ✓ HTTP timeout prevents hanging webhooks — Phase 2
 
-## Current Milestone: v1.3 Messages Dispatch
+## Current Milestone: v1.4 Independent Cron Intervals
 
-**Goal:** Add pending messages dispatch — same cycle, NO time gates, different collection and webhook.
+**Goal:** Split single CRON_INTERVAL into 3 independent intervals — one per dispatch type, each with its own setInterval and isRunning guard.
 
 **Target features:**
-- Query `messages` collection for `messageStatus: "pending"`
-- POST message to "mensagens pendentes" webhook URL
-- On success: atomic update `messageStatus: "processing"`
-- Retry 1x after 1 min, failure keeps `messageStatus: "pending"`
-- NO time gate — runs every cycle regardless of hour/day
-- Runs in same cron cycle as runs and FUP
+- Replace `CRON_INTERVAL` with `CRON_INTERVAL_RUNS`, `CRON_INTERVAL_FUP`, `CRON_INTERVAL_MESSAGES`
+- Each dispatch type runs on its own independent setInterval
+- Each has its own isRunning guard (no cross-blocking)
+- Remove old `CRON_INTERVAL` env var
+- Update validateEnv() to require the 3 new vars
+- Update Dockerfile, .env.example, docs
 
 ### Active
 
-- [ ] Query `messages` collection for `messageStatus: "pending"`
-- [ ] Read "mensagens pendentes" webhook URL from webhooks collection
-- [ ] POST message document to webhook URL
-- [ ] On success: atomic update `messageStatus: "processing"`
-- [ ] Retry once after 1 min, failure keeps `messageStatus: "pending"`
-- [ ] Runs every cycle — no timeTrigger restrictions
+- [ ] Replace `CRON_INTERVAL` with `CRON_INTERVAL_RUNS`, `CRON_INTERVAL_FUP`, `CRON_INTERVAL_MESSAGES`
+- [ ] Each dispatch type has its own independent setInterval
+- [ ] Each dispatch type has its own isRunning guard
+- [ ] Remove old `CRON_INTERVAL` env var and validation
+- [ ] Update .env.example with new env vars
+- [ ] Update docs/vars-schema.md
 - [ ] Uses `timeTrigger.allowedDays` for day-of-week gate
 
 ### Out of Scope
@@ -102,4 +102,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-26 after milestone v1.3 started*
+*Last updated: 2026-03-26 after milestone v1.4 started*

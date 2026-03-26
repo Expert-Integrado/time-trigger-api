@@ -1,8 +1,8 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.3
-milestone_name: Messages Dispatch
-status: Milestone complete
+milestone: v1.4
+milestone_name: Independent Cron Intervals
+status: Defining requirements
 stopped_at: Completed 07-messages-dispatch 07-01-PLAN.md
 last_updated: "2026-03-26T17:55:51.543Z"
 progress:

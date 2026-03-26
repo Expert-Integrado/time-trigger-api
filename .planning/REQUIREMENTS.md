@@ -1,56 +1,62 @@
-# Requirements: Time Trigger API — Milestone v1.3
+# Requirements: Time Trigger API — Milestone v1.4
 
 **Defined:** 2026-03-26
-**Core Value:** Runs, FUPs, and messages must be detected and dispatched reliably — no missed dispatches, no duplicates.
+**Core Value:** Each dispatch type runs on its own independent interval — no cross-blocking.
 
-## v1.3 Requirements
+## v1.4 Requirements
 
-Requirements for Messages Dispatch milestone.
+Requirements for Independent Cron Intervals milestone.
 
-### Message Detection
+### Env Vars
 
-- [x] **MSG-01**: Each cycle queries `messages` collection for documents with `messageStatus: "pending"`
-- [x] **MSG-02**: Messages dispatch has NO time gate — runs every cycle regardless of morningLimit/nightLimit
-- [x] **MSG-03**: Messages dispatch has NO day gate — runs every cycle regardless of allowedDays
+- [ ] **CRON-01**: `CRON_INTERVAL_RUNS` env var controls interval for runs dispatch (in milliseconds)
+- [ ] **CRON-02**: `CRON_INTERVAL_FUP` env var controls interval for FUP dispatch (in milliseconds)
+- [ ] **CRON-03**: `CRON_INTERVAL_MESSAGES` env var controls interval for messages dispatch (in milliseconds)
+- [ ] **CRON-04**: Old `CRON_INTERVAL` env var is removed — no longer read or validated
 
-### Message Dispatch
+### Independent Scheduling
 
-- [x] **MSG-04**: Eligible message document is POSTed as JSON to the "mensagens pendentes" URL from `webhooks` collection
-- [x] **MSG-05**: On successful POST, message is updated atomically via `findOneAndUpdate` to `messageStatus: "processing"`
-- [x] **MSG-06**: Atomic update uses `{ messageStatus: "pending" }` as filter condition to prevent duplicate dispatch
-- [x] **MSG-07**: On failed POST, retries once after 1 minute delay
-- [x] **MSG-08**: If retry also fails, message remains as `messageStatus: "pending"` (picked up in next cycle)
+- [ ] **CRON-05**: Each dispatch type has its own `setInterval` registered via `SchedulerRegistry`
+- [ ] **CRON-06**: Each dispatch type has its own `isRunning` guard — one slow dispatch does not block others
+- [ ] **CRON-07**: Each interval can be different (e.g., messages every 5s, runs every 10s, FUP every 30s)
 
-### Integration
+### Startup Validation
 
-- [x] **MSG-09**: Messages dispatch runs in the same cron cycle as runs and FUP dispatch (within `processDatabase()`)
+- [ ] **CRON-08**: Service fails fast if any of the 3 new env vars is missing
+- [ ] **CRON-09**: Old `CRON_INTERVAL` validation removed from `validateEnv()`
+
+### Documentation
+
+- [ ] **CRON-10**: `.env.example` updated with new env vars
+- [ ] **CRON-11**: `docs/vars-schema.md` updated with new env vars
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Time gate for messages | Messages run 24/7 — no timeTrigger restrictions |
-| Day gate for messages | Messages run every day |
-| Message response processing | Downstream webhook handles lifecycle after processing |
+| Dynamic interval changes at runtime | Intervals set at startup from env — restart to change |
+| Per-database intervals | Interval is global per dispatch type, not per client |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MSG-01 | Phase 7 | Complete |
-| MSG-02 | Phase 7 | Complete |
-| MSG-03 | Phase 7 | Complete |
-| MSG-04 | Phase 7 | Complete |
-| MSG-05 | Phase 7 | Complete |
-| MSG-06 | Phase 7 | Complete |
-| MSG-07 | Phase 7 | Complete |
-| MSG-08 | Phase 7 | Complete |
-| MSG-09 | Phase 7 | Complete |
+| CRON-01 | Pending | Pending |
+| CRON-02 | Pending | Pending |
+| CRON-03 | Pending | Pending |
+| CRON-04 | Pending | Pending |
+| CRON-05 | Pending | Pending |
+| CRON-06 | Pending | Pending |
+| CRON-07 | Pending | Pending |
+| CRON-08 | Pending | Pending |
+| CRON-09 | Pending | Pending |
+| CRON-10 | Pending | Pending |
+| CRON-11 | Pending | Pending |
 
 **Coverage:**
-- v1.3 requirements: 9 total
-- Mapped to phases: 9
-- Unmapped: 0 ✓
+- v1.4 requirements: 11 total
+- Mapped to phases: 0
+- Unmapped: 11 ⚠️
 
 ---
 *Requirements defined: 2026-03-26*
