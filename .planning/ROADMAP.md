@@ -109,7 +109,10 @@ Plans:
   3. An eligible FUP document is POSTed to the "FUP" webhook URL read from the `webhooks` collection; on success, `status` is updated atomically to `"queued"` via `findOneAndUpdate` with `{ status: "on" }` as the filter — concurrent cycles cannot dispatch the same FUP twice
   4. A failed FUP POST retries once after 1 minute; if the retry also fails, the document remains as `status: "on"` and is picked up in the next cycle
   5. FUP dispatch runs inside `processDatabase()` — same call path as runs, no separate cron or module required
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 06-01-PLAN.md — dispatchFup() em WebhookDispatchService + bloco FUP em processDatabase(); TDD cobrindo FUP-01 a FUP-09
 
 ## Progress
 
@@ -123,4 +126,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. Operational Hardening | v1.0 | 3/3 | Complete | 2026-03-25 |
 | 4. Database Targeting | v1.1 | 1/1 | Complete | 2026-03-25 |
 | 5. Per-Client Time Controls | v1.1 | 1/1 | Complete | 2026-03-25 |
-| 6. FUP Dispatch | v1.2 | 0/? | Not started | - |
+| 6. FUP Dispatch | v1.2 | 0/1 | Not started | - |
