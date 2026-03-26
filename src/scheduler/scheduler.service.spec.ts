@@ -32,7 +32,7 @@ describe('SchedulerService', () => {
         {
           provide: RunDispatchService,
           useValue: {
-            runCycle: jest.fn().mockResolvedValue(undefined),
+            runRunsCycle: jest.fn().mockResolvedValue(undefined),
           },
         },
       ],
@@ -63,12 +63,12 @@ describe('SchedulerService', () => {
     );
   });
 
-  it('(SCHED-01) the setInterval callback calls runDispatchService.runCycle()', () => {
+  it('(SCHED-01) the setInterval callback calls runDispatchService.runRunsCycle()', () => {
     service.onModuleInit();
 
     jest.advanceTimersByTime(10000);
 
-    expect(runDispatchService.runCycle).toHaveBeenCalled();
+    expect(runDispatchService.runRunsCycle).toHaveBeenCalled();
   });
 
   it('onModuleDestroy calls schedulerRegistry.deleteInterval("dispatch-cycle")', () => {

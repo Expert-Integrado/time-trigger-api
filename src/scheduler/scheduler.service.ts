@@ -26,7 +26,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
       this.configService.getOrThrow<string>('CRON_INTERVAL'),
     );
     const intervalId = setInterval(
-      () => void this.runDispatchService.runCycle(),
+      () => void this.runDispatchService.runRunsCycle(),
       intervalMs,
     );
     this.schedulerRegistry.addInterval('dispatch-cycle', intervalId);
