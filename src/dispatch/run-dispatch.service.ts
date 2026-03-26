@@ -120,7 +120,9 @@ export class RunDispatchService {
     }
 
     // FUP-01, FUP-04: detect eligible FUPs
-    const fupWebhookUrl = webhookDoc?.['Gerenciador follow up'];
+    const fupWebhookUrl = webhookDoc?.['Gerenciador follow up'] as
+      | string
+      | undefined;
     if (!fupWebhookUrl) {
       this.logger.warn(
         `[${dbName}] "Gerenciador follow up" URL missing from webhooks — skipping FUP dispatch`,
