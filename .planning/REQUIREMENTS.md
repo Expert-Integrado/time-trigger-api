@@ -9,21 +9,21 @@ Requirements for FUP Dispatch milestone.
 
 ### FUP Detection
 
-- [ ] **FUP-01**: Each cycle queries `fup` collection for documents with `status: "on"` AND `nextInteractionTimestamp <= Date.now()`
-- [ ] **FUP-02**: FUP detection uses same `timeTrigger.morningLimit`/`nightLimit` time gate as runs
-- [ ] **FUP-03**: FUP detection uses same `timeTrigger.allowedDays` day-of-week gate as runs
+- [x] **FUP-01**: Each cycle queries `fup` collection for documents with `status: "on"` AND `nextInteractionTimestamp <= Date.now()`
+- [x] **FUP-02**: FUP detection uses same `timeTrigger.morningLimit`/`nightLimit` time gate as runs
+- [x] **FUP-03**: FUP detection uses same `timeTrigger.allowedDays` day-of-week gate as runs
 
 ### FUP Dispatch
 
-- [ ] **FUP-04**: Eligible FUP document is POSTed as JSON to the "FUP" URL from `webhooks` collection
-- [ ] **FUP-05**: On successful POST, FUP is updated atomically via `findOneAndUpdate` to `status: "queued"`
-- [ ] **FUP-06**: Atomic update uses `{ status: "on" }` as filter condition to prevent duplicate dispatch
-- [ ] **FUP-07**: On failed POST, retries once after 1 minute delay
-- [ ] **FUP-08**: If retry also fails, FUP remains as `status: "on"` (picked up in next cycle)
+- [x] **FUP-04**: Eligible FUP document is POSTed as JSON to the "FUP" URL from `webhooks` collection
+- [x] **FUP-05**: On successful POST, FUP is updated atomically via `findOneAndUpdate` to `status: "queued"`
+- [x] **FUP-06**: Atomic update uses `{ status: "on" }` as filter condition to prevent duplicate dispatch
+- [x] **FUP-07**: On failed POST, retries once after 1 minute delay
+- [x] **FUP-08**: If retry also fails, FUP remains as `status: "on"` (picked up in next cycle)
 
 ### Integration
 
-- [ ] **FUP-09**: FUP dispatch runs in the same cron cycle as runs dispatch (within `processDatabase()`)
+- [x] **FUP-09**: FUP dispatch runs in the same cron cycle as runs dispatch (within `processDatabase()`)
 
 ## Out of Scope
 
@@ -37,15 +37,15 @@ Requirements for FUP Dispatch milestone.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FUP-01 | Phase 6 | Pending |
-| FUP-02 | Phase 6 | Pending |
-| FUP-03 | Phase 6 | Pending |
-| FUP-04 | Phase 6 | Pending |
-| FUP-05 | Phase 6 | Pending |
-| FUP-06 | Phase 6 | Pending |
-| FUP-07 | Phase 6 | Pending |
-| FUP-08 | Phase 6 | Pending |
-| FUP-09 | Phase 6 | Pending |
+| FUP-01 | Phase 6 | Complete |
+| FUP-02 | Phase 6 | Complete |
+| FUP-03 | Phase 6 | Complete |
+| FUP-04 | Phase 6 | Complete |
+| FUP-05 | Phase 6 | Complete |
+| FUP-06 | Phase 6 | Complete |
+| FUP-07 | Phase 6 | Complete |
+| FUP-08 | Phase 6 | Complete |
+| FUP-09 | Phase 6 | Complete |
 
 **Coverage:**
 - v1.2 requirements: 9 total

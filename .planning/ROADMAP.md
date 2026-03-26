@@ -112,7 +112,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 06-01-PLAN.md — dispatchFup() em WebhookDispatchService + bloco FUP em processDatabase(); TDD cobrindo FUP-01 a FUP-09
+- [x] 06-01-PLAN.md — dispatchFup() em WebhookDispatchService + bloco FUP em processDatabase(); TDD cobrindo FUP-01 a FUP-09
 
 ## Progress
 
@@ -126,4 +126,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. Operational Hardening | v1.0 | 3/3 | Complete | 2026-03-25 |
 | 4. Database Targeting | v1.1 | 1/1 | Complete | 2026-03-25 |
 | 5. Per-Client Time Controls | v1.1 | 1/1 | Complete | 2026-03-25 |
-| 6. FUP Dispatch | v1.2 | 0/1 | Not started | - |
+| 6. FUP Dispatch | v1.2 | 1/1 | Complete   | 2026-03-26 |

@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: FUP Dispatch
-status: Roadmap ready
-stopped_at: "Roadmap created for v1.2 — Phase 6 defined, ready for plan-phase"
-last_updated: "2026-03-26T00:00:00.000Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 06-fup-dispatch-01-PLAN.md
+last_updated: "2026-03-26T15:18:36.323Z"
 progress:
   total_phases: 1
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
 ---
 
 # Project State
@@ -23,14 +23,8 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 
 ## Current Position
 
-Phase: 06
-Plan: Not started
-Status: Not started
-
-```
-v1.2 Progress: [          ] 0%
-Phase 6: [ ] FUP Dispatch
-```
+Phase: 06 (fup-dispatch) — EXECUTING
+Plan: 1 of 1
 
 ## Performance Metrics
 
@@ -51,6 +45,7 @@ Phase 6: [ ] FUP Dispatch
 | 05-per-client-time-controls | 1 | ~2 min | ~2 min |
 
 *Updated after each plan completion*
+| Phase 06-fup-dispatch P01 | 4 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -70,6 +65,9 @@ Recent decisions affecting current work:
 - [Phase 05]: timeTrigger absence = warn + skip pattern; verification order: enabled -> time -> day -> webhooks -> runs
 - [Phase 05]: isAllowedDay uses TZ=America/Sao_Paulo convention via new Date().getDay() — same as isWithinTimeWindow
 - [Phase 06 roadmap]: FUP dispatch lives inside processDatabase() — no new module or cron needed; mirrors runs dispatch pattern
+- [Phase 06-fup-dispatch]: dispatchFup() implemented as separate method to keep runs dispatch isolated
+- [Phase 06-fup-dispatch]: Missing FUP URL: warn + skip FUP dispatch, runs dispatch unaffected
+- [Phase 06-fup-dispatch]: FUP $set: { status: 'queued' } only, no queuedAt field
 
 ### Pending Todos
 
@@ -87,6 +85,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26
-Stopped at: 2026-03-26 - v1.2 roadmap created, Phase 6 defined
+Last session: 2026-03-26T15:18:36.317Z
+Stopped at: Completed 06-fup-dispatch-01-PLAN.md
 Resume file: None
