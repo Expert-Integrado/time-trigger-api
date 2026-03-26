@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Independent Cron Intervals
-status: Ready to plan
-stopped_at: Roadmap created for v1.4 — Phase 8 ready for plan-phase
-last_updated: "2026-03-26"
+status: Ready to execute
+stopped_at: Completed 08-01-PLAN.md
+last_updated: "2026-03-26T18:27:45.456Z"
 progress:
   total_phases: 1
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 3
+  completed_plans: 1
 ---
 
 # Project State
@@ -19,16 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Runs, FUPs, and messages must be detected and dispatched to their webhooks reliably — no missed dispatches, no duplicates.
-**Current focus:** Phase 8 — Independent Cron Intervals
+**Current focus:** Phase 08 — independent-cron-intervals
 
 ## Current Position
 
-Phase: 8 of 8 (v1.4 scope)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-03-26 — v1.4 roadmap created, Phase 8 defined
-
-Progress: [████████░░] 87% (7/8 phases complete across all milestones)
+Phase: 08 (independent-cron-intervals) — EXECUTING
+Plan: 2 of 3
 
 ## Performance Metrics
 
@@ -51,6 +47,7 @@ Progress: [████████░░] 87% (7/8 phases complete across all m
 | 07-messages-dispatch | 1 | ~3 min | ~3 min |
 
 *Updated after each plan completion*
+| Phase 08 P01 | 264 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -63,6 +60,8 @@ Recent decisions affecting current work:
 - [Phase 07]: Atomic claim uses `{ messageStatus: "pending" }` as filter; transitions to `"processing"` on success
 - [Phase 07]: Webhooks collection read twice per cycle (once inside timeTrigger block for runs/FUP, once outside for messages) — intentional
 - [v1.4 roadmap]: Split RunDispatchService.runCycle() into runRunsCycle(), runFupCycle(), runMessagesCycle() — each called by its own setInterval
+- [Phase 08]: runRunsCycle dispatches both runs AND FUPs — they share timeTrigger gate in same DB pass
+- [Phase 08]: Scheduler temporarily wired to runRunsCycle only; Plan 02 will add independent intervals for FUP and messages
 
 ### Pending Todos
 
@@ -74,6 +73,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26
-Stopped at: Roadmap created for v1.4 — Phase 8 ready for plan-phase
+Last session: 2026-03-26T18:27:45.449Z
+Stopped at: Completed 08-01-PLAN.md
 Resume file: None

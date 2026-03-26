@@ -17,8 +17,8 @@ Requirements for Independent Cron Intervals milestone.
 ### Independent Scheduling
 
 - [ ] **CRON-05**: Each dispatch type has its own `setInterval` registered via `SchedulerRegistry`
-- [ ] **CRON-06**: Each dispatch type has its own `isRunning` guard — one slow dispatch does not block others
-- [ ] **CRON-07**: Each interval can be different (e.g., messages every 5s, runs every 10s, FUP every 30s)
+- [x] **CRON-06**: Each dispatch type has its own `isRunning` guard — one slow dispatch does not block others
+- [x] **CRON-07**: Each interval can be different (e.g., messages every 5s, runs every 10s, FUP every 30s)
 
 ### Startup Validation
 
@@ -46,8 +46,8 @@ Requirements for Independent Cron Intervals milestone.
 | CRON-03 | Phase 8 | Pending |
 | CRON-04 | Phase 8 | Pending |
 | CRON-05 | Phase 8 | Pending |
-| CRON-06 | Phase 8 | Pending |
-| CRON-07 | Phase 8 | Pending |
+| CRON-06 | Phase 8 | Complete |
+| CRON-07 | Phase 8 | Complete |
 | CRON-08 | Phase 8 | Pending |
 | CRON-09 | Phase 8 | Pending |
 | CRON-10 | Phase 8 | Pending |
