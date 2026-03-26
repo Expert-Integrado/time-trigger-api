@@ -16,15 +16,18 @@ describe('RunDispatchService', () => {
     vars: Record<string, unknown> | null,
     webhooks: Record<string, unknown> | null,
     runs: Record<string, unknown>[],
+    fups: Record<string, unknown>[] = [],
   ) => {
-    const mockFind = { toArray: jest.fn().mockResolvedValue(runs) };
+    const mockRunsFind = { toArray: jest.fn().mockResolvedValue(runs) };
+    const mockFupsFind = { toArray: jest.fn().mockResolvedValue(fups) };
     const collections: Record<
       string,
       { findOne?: jest.Mock; find?: jest.Mock }
     > = {
       vars: { findOne: jest.fn().mockResolvedValue(vars) },
       webhooks: { findOne: jest.fn().mockResolvedValue(webhooks) },
-      runs: { find: jest.fn().mockReturnValue(mockFind) },
+      runs: { find: jest.fn().mockReturnValue(mockRunsFind) },
+      fup: { find: jest.fn().mockReturnValue(mockFupsFind) },
     };
     return {
       collection: jest.fn((name: string) => collections[name]),
@@ -46,7 +49,10 @@ describe('RunDispatchService', () => {
         RunDispatchService,
         {
           provide: WebhookDispatchService,
-          useValue: { dispatch: jest.fn().mockResolvedValue(undefined) },
+          useValue: {
+            dispatch: jest.fn().mockResolvedValue(undefined),
+            dispatchFup: jest.fn().mockResolvedValue(undefined),
+          },
         },
         {
           provide: MongoService,
@@ -75,7 +81,16 @@ describe('RunDispatchService', () => {
       allowedDays: [0, 1, 2, 3, 4, 5, 6],
     },
   };
-  const webhooksDoc = { 'Processador de Runs': 'https://hook.example.com' };
+  const eligibleFup = {
+    _id: 'fup-001',
+    status: 'on',
+    nextInteractionTimestamp: 1_000, // valor no passado
+  };
+
+  const webhooksDoc = {
+    'Processador de Runs': 'https://hook.example.com',
+    FUP: 'https://fup.example.com',
+  };
 
   it('(DETECT-01) queries runs collection with runStatus:waiting and waitUntil <= now', async () => {
     const db = makeDb(withinWindowVars, webhooksDoc, []);
@@ -433,6 +448,127 @@ describe('RunDispatchService', () => {
     expect(logSpy).toHaveBeenCalledWith(
       expect.stringMatching(/2 DBs.*1 errors/),
     );
+    jest.restoreAllMocks();
+  });
+
+  // FUP tests
+
+  it('(FUP-01) queries fup collection with { status: "on", nextInteractionTimestamp: { $lte: <number> } }', async () => {
+    const db = makeDb(withinWindowVars, webhooksDoc, [], [eligibleFup]);
+    mongoService.db.mockReturnValue(db as unknown as Db);
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+    await service.runCycle();
+
+    const fupCollectionFind = (db as any)._collections.fup.find;
+    expect(fupCollectionFind).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'on',
+        nextInteractionTimestamp: expect.objectContaining({
+          $lte: expect.any(Number),
+        }),
+      }),
+    );
+    jest.restoreAllMocks();
+  });
+
+  it('(FUP-02/FUP-03) FUP is NOT dispatched when outside time window (currentHour < morningLimit)', async () => {
+    const db = makeDb(withinWindowVars, webhooksDoc, [], [eligibleFup]);
+    mongoService.db.mockReturnValue(db as unknown as Db);
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(5); // before morningLimit
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+    await service.runCycle();
+
+    expect(webhookDispatchService.dispatchFup).not.toHaveBeenCalled();
+    jest.restoreAllMocks();
+  });
+
+  it('(FUP-02/FUP-03) FUP is NOT dispatched when day not in allowedDays', async () => {
+    const db = makeDb(withinWindowVars, webhooksDoc, [], [eligibleFup]);
+    mongoService.db.mockReturnValue(db as unknown as Db);
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(0); // domingo, não em allowedDays limitado
+    const restrictedVars = {
+      timeTrigger: {
+        enabled: true,
+        morningLimit: 8,
+        nightLimit: 22,
+        allowedDays: [1, 2, 3, 4, 5], // só dias úteis
+      },
+    };
+    const dbRestricted = makeDb(restrictedVars, webhooksDoc, [], [eligibleFup]);
+    mongoService.db.mockReturnValue(dbRestricted as unknown as Db);
+
+    await service.runCycle();
+
+    expect(webhookDispatchService.dispatchFup).not.toHaveBeenCalled();
+    jest.restoreAllMocks();
+  });
+
+  it('(FUP-09) dispatchFup is called for each eligible FUP within window', async () => {
+    const fup2 = {
+      _id: 'fup-002',
+      status: 'on',
+      nextInteractionTimestamp: 500,
+    };
+    const db = makeDb(withinWindowVars, webhooksDoc, [], [eligibleFup, fup2]);
+    mongoService.db.mockReturnValue(db as unknown as Db);
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+    await service.runCycle();
+
+    expect(webhookDispatchService.dispatchFup).toHaveBeenCalledTimes(2);
+    expect(webhookDispatchService.dispatchFup).toHaveBeenCalledWith(
+      expect.anything(),
+      eligibleFup,
+      'https://fup.example.com',
+    );
+    jest.restoreAllMocks();
+  });
+
+  it('(FUP-09) runs dispatch and FUP dispatch occur in the same processDatabase() call', async () => {
+    const db = makeDb(
+      withinWindowVars,
+      webhooksDoc,
+      [eligibleRun],
+      [eligibleFup],
+    );
+    mongoService.db.mockReturnValue(db as unknown as Db);
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+    await service.runCycle();
+
+    expect(webhookDispatchService.dispatch).toHaveBeenCalledTimes(1);
+    expect(webhookDispatchService.dispatchFup).toHaveBeenCalledTimes(1);
+    jest.restoreAllMocks();
+  });
+
+  it('FUP URL absent → logs warn and does NOT call dispatchFup, but runs still dispatched', async () => {
+    const webhooksWithoutFup = {
+      'Processador de Runs': 'https://hook.example.com',
+    };
+    const db = makeDb(
+      withinWindowVars,
+      webhooksWithoutFup,
+      [eligibleRun],
+      [eligibleFup],
+    );
+    mongoService.db.mockReturnValue(db as unknown as Db);
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+    const warnSpy = jest
+      .spyOn((service as any).logger, 'warn')
+      .mockImplementation(() => {});
+
+    await service.runCycle();
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('FUP'));
+    expect(webhookDispatchService.dispatchFup).not.toHaveBeenCalled();
+    expect(webhookDispatchService.dispatch).toHaveBeenCalledTimes(1);
     jest.restoreAllMocks();
   });
 });

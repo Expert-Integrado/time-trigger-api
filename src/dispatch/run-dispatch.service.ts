@@ -17,6 +17,7 @@ interface VarsDoc {
 
 interface WebhookDoc {
   'Processador de Runs'?: string;
+  FUP?: string;
 }
 
 @Injectable()
@@ -116,6 +117,24 @@ export class RunDispatchService {
 
     for (const run of runs) {
       await this.webhookDispatchService.dispatch(db, run, webhookUrl);
+    }
+
+    // FUP-01, FUP-04: detect eligible FUPs
+    const fupWebhookUrl = webhookDoc?.['FUP'];
+    if (!fupWebhookUrl) {
+      this.logger.warn(
+        `[${dbName}] "FUP" URL missing from webhooks — skipping FUP dispatch`,
+      );
+    } else {
+      const fups: Document[] = await db
+        .collection('fup')
+        .find({ status: 'on', nextInteractionTimestamp: { $lte: Date.now() } })
+        .toArray();
+
+      for (const fup of fups) {
+        // FUP-09: dispatch each eligible FUP
+        await this.webhookDispatchService.dispatchFup(db, fup, fupWebhookUrl);
+      }
     }
   }
 
