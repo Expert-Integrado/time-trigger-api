@@ -37,20 +37,20 @@ Requirements for Messages Dispatch milestone.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MSG-01 | Pending | Pending |
-| MSG-02 | Pending | Pending |
-| MSG-03 | Pending | Pending |
-| MSG-04 | Pending | Pending |
-| MSG-05 | Pending | Pending |
-| MSG-06 | Pending | Pending |
-| MSG-07 | Pending | Pending |
-| MSG-08 | Pending | Pending |
-| MSG-09 | Pending | Pending |
+| MSG-01 | Phase 7 | Pending |
+| MSG-02 | Phase 7 | Pending |
+| MSG-03 | Phase 7 | Pending |
+| MSG-04 | Phase 7 | Pending |
+| MSG-05 | Phase 7 | Pending |
+| MSG-06 | Phase 7 | Pending |
+| MSG-07 | Phase 7 | Pending |
+| MSG-08 | Phase 7 | Pending |
+| MSG-09 | Phase 7 | Pending |
 
 **Coverage:**
 - v1.3 requirements: 9 total
-- Mapped to phases: 0
-- Unmapped: 9 ⚠️
+- Mapped to phases: 9
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-26*

@@ -4,7 +4,8 @@
 
 - ✅ **v1.0 MVP** - Phases 1-3 (shipped 2026-03-25)
 - ✅ **v1.1 Per-Client Controls** - Phases 4-5 (shipped 2026-03-25)
-- 🚧 **v1.2 FUP Dispatch** - Phase 6 (in progress)
+- ✅ **v1.2 FUP Dispatch** - Phase 6 (shipped 2026-03-26)
+- 🚧 **v1.3 Messages Dispatch** - Phase 7 (in progress)
 
 ## Phases
 
@@ -95,11 +96,10 @@ Plans:
 
 </details>
 
-### 🚧 v1.2 FUP Dispatch (In Progress)
+<details>
+<summary>✅ v1.2 FUP Dispatch (Phase 6) - SHIPPED 2026-03-26</summary>
 
-**Milestone Goal:** Add follow-up (FUP) dispatch alongside existing runs dispatch — same cron cycle, same time and day gates, different collection (`fup`) and webhook URL ("FUP"). No duplicate dispatches; atomic claim; single retry on failure.
-
-#### Phase 6: FUP Dispatch
+### Phase 6: FUP Dispatch
 **Goal**: Each cron cycle also processes the `fup` collection, detecting eligible FUP documents and dispatching them to the FUP webhook — atomically preventing duplicates, with a single retry on failure, reusing the same time and day gates already applied to runs
 **Depends on**: Phase 5
 **Requirements**: FUP-01, FUP-02, FUP-03, FUP-04, FUP-05, FUP-06, FUP-07, FUP-08, FUP-09
@@ -114,10 +114,27 @@ Plans:
 Plans:
 - [x] 06-01-PLAN.md — dispatchFup() em WebhookDispatchService + bloco FUP em processDatabase(); TDD cobrindo FUP-01 a FUP-09
 
+</details>
+
+### 🚧 v1.3 Messages Dispatch (In Progress)
+
+**Milestone Goal:** Add pending messages dispatch to the same cron cycle — NO time gates, NO day gates, different collection (`messages`) and webhook URL ("mensagens pendentes"). Atomic claim prevents duplicate dispatch; single retry on failure.
+
+#### Phase 7: Messages Dispatch
+**Goal**: Each cron cycle also processes the `messages` collection, detecting documents with `messageStatus: "pending"` and dispatching them to the "mensagens pendentes" webhook — with no time or day restrictions, atomic duplicate prevention, and a single retry on failure
+**Depends on**: Phase 6
+**Requirements**: MSG-01, MSG-02, MSG-03, MSG-04, MSG-05, MSG-06, MSG-07, MSG-08, MSG-09
+**Success Criteria** (what must be TRUE):
+  1. Each cycle queries the `messages` collection for documents with `messageStatus: "pending"` — regardless of the current hour, day, or whether `timeTrigger` gates would block runs
+  2. An eligible message document is POSTed to the "mensagens pendentes" webhook URL read from the `webhooks` collection; on success, `messageStatus` is updated atomically to `"processing"` via `findOneAndUpdate` with `{ messageStatus: "pending" }` as the filter — a concurrent cycle cannot dispatch the same message twice
+  3. A failed message POST retries once after 1 minute; if the retry also fails, the document remains as `messageStatus: "pending"` and is picked up in the next cycle
+  4. Messages dispatch runs inside `processDatabase()` in the same cron cycle as runs and FUP — no separate cron, scheduler, or module is required
+**Plans**: TBD
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -126,4 +143,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. Operational Hardening | v1.0 | 3/3 | Complete | 2026-03-25 |
 | 4. Database Targeting | v1.1 | 1/1 | Complete | 2026-03-25 |
 | 5. Per-Client Time Controls | v1.1 | 1/1 | Complete | 2026-03-25 |
-| 6. FUP Dispatch | v1.2 | 1/1 | Complete   | 2026-03-26 |
+| 6. FUP Dispatch | v1.2 | 1/1 | Complete | 2026-03-26 |
+| 7. Messages Dispatch | v1.3 | 0/? | Not started | - |

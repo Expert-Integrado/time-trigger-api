@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Messages Dispatch
-status: Defining requirements
-stopped_at: Completed 06-fup-dispatch-01-PLAN.md
-last_updated: "2026-03-26T15:21:41.072Z"
+status: Ready to plan
+stopped_at: Roadmap created for v1.3 — Phase 7 defined
+last_updated: "2026-03-26"
 progress:
   total_phases: 1
-  completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
@@ -18,21 +18,25 @@ progress:
 
 See: .planning/PROJECT.md (updated 2026-03-26)
 
-**Core value:** Runs and FUPs with the right status must be detected and dispatched to their webhooks reliably — no missed dispatches, no duplicates.
-**Current focus:** Phase 06 — fup-dispatch
+**Core value:** Runs, FUPs, and messages must be detected and dispatched to their webhooks reliably — no missed dispatches, no duplicates.
+**Current focus:** Phase 07 — messages-dispatch
 
 ## Current Position
 
-Phase: 06
+Phase: 07 of 07 (Messages Dispatch)
 Plan: Not started
+Status: Ready to plan
+Last activity: 2026-03-26 — Roadmap created, Phase 7 defined with 9 requirements mapped
+
+Progress: [██████████░] 86% (6/7 phases complete)
 
 ## Performance Metrics
 
-**Velocity (inherited from v1.0/v1.1):**
+**Velocity (inherited from v1.0–v1.2):**
 
-- Total plans completed: 9
+- Total plans completed: 10
 - Average duration: ~2.5 min
-- Total execution time: ~22.5 min
+- Total execution time: ~25 min
 
 **By Phase:**
 
@@ -43,9 +47,9 @@ Plan: Not started
 | 03-operational-hardening | 3 | ~5 min | ~1.7 min |
 | 04-database-targeting | 1 | ~10 min | ~10 min |
 | 05-per-client-time-controls | 1 | ~2 min | ~2 min |
+| 06-fup-dispatch | 1 | ~2 min | ~2 min |
 
 *Updated after each plan completion*
-| Phase 06-fup-dispatch P01 | 4 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -54,20 +58,11 @@ Plan: Not started
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- Use MongoDB native driver — `client.db(dbName)` required for multi-database access
-- Re-read `vars`/`webhooks` every cycle — no caching
-- Filter databases by collection presence — only process DBs with `runs` + `webhooks` + `vars`
-- [Phase 03]: Plain NestJS controller for health check — no @nestjs/terminus needed
-- [Phase 02]: isRunning guard uses try/finally reset — flag cleared even on error
-- [Phase 01]: @Global() on MongoModule — registered once in AppModule, available project-wide
-- [Phase 04]: TARGET_DATABASES filter applied before listCollections loop — db() never called for excluded databases (FILT-03)
-- [Phase 04]: ConfigService injection over process.env for proper NestJS DI and testability
 - [Phase 05]: timeTrigger absence = warn + skip pattern; verification order: enabled -> time -> day -> webhooks -> runs
-- [Phase 05]: isAllowedDay uses TZ=America/Sao_Paulo convention via new Date().getDay() — same as isWithinTimeWindow
-- [Phase 06 roadmap]: FUP dispatch lives inside processDatabase() — no new module or cron needed; mirrors runs dispatch pattern
-- [Phase 06-fup-dispatch]: dispatchFup() implemented as separate method to keep runs dispatch isolated
-- [Phase 06-fup-dispatch]: Missing FUP URL: warn + skip FUP dispatch, runs dispatch unaffected
-- [Phase 06-fup-dispatch]: FUP $set: { status: 'queued' } only, no queuedAt field
+- [Phase 06]: dispatchFup() implemented as separate method to keep runs dispatch isolated
+- [Phase 06]: Missing FUP URL: warn + skip FUP dispatch, runs dispatch unaffected
+- [Phase 07 roadmap]: Messages dispatch has NO time gate and NO day gate — runs before or after timeTrigger block in processDatabase()
+- [Phase 07 roadmap]: Atomic claim uses `{ messageStatus: "pending" }` as filter; transitions to `"processing"` on success
 
 ### Pending Todos
 
@@ -81,10 +76,10 @@ None.
 
 ### Blockers/Concerns
 
-- Confirm `fup` collection is present in all client databases that have `runs` — or whether the collection filter in Phase 1 needs updating to also check for `fup`
+None.
 
 ## Session Continuity
 
-Last session: 2026-03-26T15:18:36.317Z
-Stopped at: Completed 06-fup-dispatch-01-PLAN.md
+Last session: 2026-03-26
+Stopped at: Roadmap created for v1.3 — Phase 7 ready to plan
 Resume file: None
