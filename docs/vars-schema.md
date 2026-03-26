@@ -21,7 +21,7 @@ Campos que devem existir na coleção `vars` de cada banco para o Time Trigger f
 
 | Campo | Tipo | Obrigatório | Descrição |
 |-------|------|-------------|-----------|
-| `timeTrigger.enabled` | boolean | Sim | `true` = processa runs desse cliente, `false` = ignora |
+| `timeTrigger.enabled` | boolean | Sim | `true` = processa runs e FUPs desse cliente, `false` = ignora |
 | `timeTrigger.morningLimit` | number | Sim | Hora mínima pra disparar (ex: 8 = 8h da manhã) |
 | `timeTrigger.nightLimit` | number | Sim | Hora máxima pra disparar (ex: 20 = 20h) |
 | `timeTrigger.allowedDays` | number[] | Sim | Dias da semana permitidos (0=Domingo, 1=Segunda ... 6=Sábado) |
@@ -90,11 +90,37 @@ Campos que devem existir na coleção `vars` de cada banco para o Time Trigger f
 
 ## Comportamento da API
 
-- Se `timeTrigger` não existir no vars → **ignora o banco** (não processa)
+### Runs Dispatch
+- Coleção: `runs`
+- Query: `runStatus: "waiting"` AND `waitUntil <= Date.now()`
+- Webhook: `"Processador de Runs"` (da coleção `webhooks`)
+- Sucesso: `runStatus` → `"queued"`, `queuedAt` = timestamp atual
+- Retry: 1x após 1 min, falha mantém `runStatus: "waiting"`
+
+### FUP Dispatch
+- Coleção: `fup`
+- Query: `status: "on"` AND `nextInteractionTimestamp <= Date.now()`
+- Webhook: `"Gerenciador follow up"` (da coleção `webhooks`)
+- Sucesso: `status` → `"queued"`
+- Retry: 1x após 1 min, falha mantém `status: "on"`
+
+### Controles do timeTrigger (aplicam a runs E FUPs)
+- Se `timeTrigger` não existir no vars → **ignora o banco** (não processa nada)
 - Se `enabled: false` → **ignora o banco**
-- Se hora atual < `morningLimit` ou >= `nightLimit` → **pula os runs**
-- Se dia da semana não está no `allowedDays` → **pula os runs**
+- Se hora atual < `morningLimit` ou >= `nightLimit` → **pula runs e FUPs**
+- Se dia da semana não está no `allowedDays` → **pula runs e FUPs**
 - Lê vars **a cada ciclo** (mudanças aplicam imediatamente)
+
+## Webhooks Necessários
+
+A coleção `webhooks` de cada banco precisa ter estes campos:
+
+| Campo | Descrição |
+|-------|-----------|
+| `"Processador de Runs"` | URL para dispatch de runs |
+| `"Gerenciador follow up"` | URL para dispatch de FUPs |
+
+Se algum webhook estiver ausente, o dispatch correspondente é pulado (com log de warning), mas o outro continua funcionando.
 
 ## Env Var: TARGET_DATABASES
 
