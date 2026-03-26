@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Independent Cron Intervals
 status: Ready to execute
-stopped_at: Completed 08-01-PLAN.md
-last_updated: "2026-03-26T18:27:45.456Z"
+stopped_at: Completed 08-03-PLAN.md
+last_updated: "2026-03-26T18:31:47.185Z"
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 ## Current Position
 
 Phase: 08 (independent-cron-intervals) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -48,6 +48,7 @@ Plan: 2 of 3
 
 *Updated after each plan completion*
 | Phase 08 P01 | 264 | 2 tasks | 4 files |
+| Phase 08-independent-cron-intervals P03 | 5min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -62,6 +63,7 @@ Recent decisions affecting current work:
 - [v1.4 roadmap]: Split RunDispatchService.runCycle() into runRunsCycle(), runFupCycle(), runMessagesCycle() — each called by its own setInterval
 - [Phase 08]: runRunsCycle dispatches both runs AND FUPs — they share timeTrigger gate in same DB pass
 - [Phase 08]: Scheduler temporarily wired to runRunsCycle only; Plan 02 will add independent intervals for FUP and messages
+- [Phase 08-independent-cron-intervals]: CRON_INTERVAL completely removed from validateEnv() — 3 new vars (RUNS/FUP/MESSAGES) required at startup; absence triggers process.exit(1)
 
 ### Pending Todos
 
@@ -73,6 +75,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26T18:27:45.449Z
-Stopped at: Completed 08-01-PLAN.md
+Last session: 2026-03-26T18:31:47.179Z
+Stopped at: Completed 08-03-PLAN.md
 Resume file: None

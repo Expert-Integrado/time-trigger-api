@@ -22,13 +22,13 @@ Requirements for Independent Cron Intervals milestone.
 
 ### Startup Validation
 
-- [ ] **CRON-08**: Service fails fast if any of the 3 new env vars is missing
-- [ ] **CRON-09**: Old `CRON_INTERVAL` validation removed from `validateEnv()`
+- [x] **CRON-08**: Service fails fast if any of the 3 new env vars is missing
+- [x] **CRON-09**: Old `CRON_INTERVAL` validation removed from `validateEnv()`
 
 ### Documentation
 
-- [ ] **CRON-10**: `.env.example` updated with new env vars
-- [ ] **CRON-11**: `docs/vars-schema.md` updated with new env vars
+- [x] **CRON-10**: `.env.example` updated with new env vars
+- [x] **CRON-11**: `docs/vars-schema.md` updated with new env vars
 
 ## Out of Scope
 
@@ -48,10 +48,10 @@ Requirements for Independent Cron Intervals milestone.
 | CRON-05 | Phase 8 | Pending |
 | CRON-06 | Phase 8 | Complete |
 | CRON-07 | Phase 8 | Complete |
-| CRON-08 | Phase 8 | Pending |
-| CRON-09 | Phase 8 | Pending |
-| CRON-10 | Phase 8 | Pending |
-| CRON-11 | Phase 8 | Pending |
+| CRON-08 | Phase 8 | Complete |
+| CRON-09 | Phase 8 | Complete |
+| CRON-10 | Phase 8 | Complete |
+| CRON-11 | Phase 8 | Complete |
 
 **Coverage:**
 - v1.4 requirements: 11 total
