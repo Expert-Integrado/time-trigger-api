@@ -111,7 +111,7 @@ export class RunDispatchService {
     // DETECT-01: find waiting runs with waitUntil in the past
     const runs: Document[] = await db
       .collection('runs')
-      .find({ runStatus: 'waiting', waitUntil: { $lte: new Date() } })
+      .find({ runStatus: 'waiting', waitUntil: { $lte: Date.now() } })
       .toArray();
 
     for (const run of runs) {

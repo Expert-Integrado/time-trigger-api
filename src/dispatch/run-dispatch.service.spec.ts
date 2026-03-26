@@ -89,7 +89,7 @@ describe('RunDispatchService', () => {
     expect(runsCollectionFind).toHaveBeenCalledWith(
       expect.objectContaining({
         runStatus: 'waiting',
-        waitUntil: expect.objectContaining({ $lte: expect.any(Date) }),
+        waitUntil: expect.objectContaining({ $lte: expect.any(Number) }),
       }),
     );
     jest.restoreAllMocks();
