@@ -132,7 +132,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 07-01-PLAN.md — dispatchMessage() em WebhookDispatchService + bloco messages em processDatabase() sem time/day gate; TDD cobrindo MSG-01 a MSG-09
+- [x] 07-01-PLAN.md — dispatchMessage() em WebhookDispatchService + bloco messages em processDatabase() sem time/day gate; TDD cobrindo MSG-01 a MSG-09
 
 ## Progress
 
@@ -147,4 +147,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 4. Database Targeting | v1.1 | 1/1 | Complete | 2026-03-25 |
 | 5. Per-Client Time Controls | v1.1 | 1/1 | Complete | 2026-03-25 |
 | 6. FUP Dispatch | v1.2 | 1/1 | Complete | 2026-03-26 |
-| 7. Messages Dispatch | v1.3 | 0/1 | Not started | - |
+| 7. Messages Dispatch | v1.3 | 1/1 | Complete   | 2026-03-26 |

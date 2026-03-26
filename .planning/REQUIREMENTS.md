@@ -9,21 +9,21 @@ Requirements for Messages Dispatch milestone.
 
 ### Message Detection
 
-- [ ] **MSG-01**: Each cycle queries `messages` collection for documents with `messageStatus: "pending"`
-- [ ] **MSG-02**: Messages dispatch has NO time gate — runs every cycle regardless of morningLimit/nightLimit
-- [ ] **MSG-03**: Messages dispatch has NO day gate — runs every cycle regardless of allowedDays
+- [x] **MSG-01**: Each cycle queries `messages` collection for documents with `messageStatus: "pending"`
+- [x] **MSG-02**: Messages dispatch has NO time gate — runs every cycle regardless of morningLimit/nightLimit
+- [x] **MSG-03**: Messages dispatch has NO day gate — runs every cycle regardless of allowedDays
 
 ### Message Dispatch
 
-- [ ] **MSG-04**: Eligible message document is POSTed as JSON to the "mensagens pendentes" URL from `webhooks` collection
-- [ ] **MSG-05**: On successful POST, message is updated atomically via `findOneAndUpdate` to `messageStatus: "processing"`
-- [ ] **MSG-06**: Atomic update uses `{ messageStatus: "pending" }` as filter condition to prevent duplicate dispatch
-- [ ] **MSG-07**: On failed POST, retries once after 1 minute delay
-- [ ] **MSG-08**: If retry also fails, message remains as `messageStatus: "pending"` (picked up in next cycle)
+- [x] **MSG-04**: Eligible message document is POSTed as JSON to the "mensagens pendentes" URL from `webhooks` collection
+- [x] **MSG-05**: On successful POST, message is updated atomically via `findOneAndUpdate` to `messageStatus: "processing"`
+- [x] **MSG-06**: Atomic update uses `{ messageStatus: "pending" }` as filter condition to prevent duplicate dispatch
+- [x] **MSG-07**: On failed POST, retries once after 1 minute delay
+- [x] **MSG-08**: If retry also fails, message remains as `messageStatus: "pending"` (picked up in next cycle)
 
 ### Integration
 
-- [ ] **MSG-09**: Messages dispatch runs in the same cron cycle as runs and FUP dispatch (within `processDatabase()`)
+- [x] **MSG-09**: Messages dispatch runs in the same cron cycle as runs and FUP dispatch (within `processDatabase()`)
 
 ## Out of Scope
 
@@ -37,15 +37,15 @@ Requirements for Messages Dispatch milestone.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MSG-01 | Phase 7 | Pending |
-| MSG-02 | Phase 7 | Pending |
-| MSG-03 | Phase 7 | Pending |
-| MSG-04 | Phase 7 | Pending |
-| MSG-05 | Phase 7 | Pending |
-| MSG-06 | Phase 7 | Pending |
-| MSG-07 | Phase 7 | Pending |
-| MSG-08 | Phase 7 | Pending |
-| MSG-09 | Phase 7 | Pending |
+| MSG-01 | Phase 7 | Complete |
+| MSG-02 | Phase 7 | Complete |
+| MSG-03 | Phase 7 | Complete |
+| MSG-04 | Phase 7 | Complete |
+| MSG-05 | Phase 7 | Complete |
+| MSG-06 | Phase 7 | Complete |
+| MSG-07 | Phase 7 | Complete |
+| MSG-08 | Phase 7 | Complete |
+| MSG-09 | Phase 7 | Complete |
 
 **Coverage:**
 - v1.3 requirements: 9 total
