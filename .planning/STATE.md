@@ -1,8 +1,8 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: FUP Dispatch
-status: Milestone complete
+milestone: v1.3
+milestone_name: Messages Dispatch
+status: Defining requirements
 stopped_at: Completed 06-fup-dispatch-01-PLAN.md
 last_updated: "2026-03-26T15:21:41.072Z"
 progress:
