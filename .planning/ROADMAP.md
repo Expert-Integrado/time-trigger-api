@@ -5,7 +5,8 @@
 - ✅ **v1.0 MVP** - Phases 1-3 (shipped 2026-03-25)
 - ✅ **v1.1 Per-Client Controls** - Phases 4-5 (shipped 2026-03-25)
 - ✅ **v1.2 FUP Dispatch** - Phase 6 (shipped 2026-03-26)
-- 🚧 **v1.3 Messages Dispatch** - Phase 7 (in progress)
+- ✅ **v1.3 Messages Dispatch** - Phase 7 (shipped 2026-03-26)
+- 🚧 **v1.4 Independent Cron Intervals** - Phase 8 (in progress)
 
 ## Phases
 
@@ -116,11 +117,10 @@ Plans:
 
 </details>
 
-### 🚧 v1.3 Messages Dispatch (In Progress)
+<details>
+<summary>✅ v1.3 Messages Dispatch (Phase 7) - SHIPPED 2026-03-26</summary>
 
-**Milestone Goal:** Add pending messages dispatch to the same cron cycle — NO time gates, NO day gates, different collection (`messages`) and webhook URL ("mensagens pendentes"). Atomic claim prevents duplicate dispatch; single retry on failure.
-
-#### Phase 7: Messages Dispatch
+### Phase 7: Messages Dispatch
 **Goal**: Each cron cycle also processes the `messages` collection, detecting documents with `messageStatus: "pending"` and dispatching them to the "mensagens pendentes" webhook — with no time or day restrictions, atomic duplicate prevention, and a single retry on failure
 **Depends on**: Phase 6
 **Requirements**: MSG-01, MSG-02, MSG-03, MSG-04, MSG-05, MSG-06, MSG-07, MSG-08, MSG-09
@@ -134,10 +134,28 @@ Plans:
 Plans:
 - [x] 07-01-PLAN.md — dispatchMessage() em WebhookDispatchService + bloco messages em processDatabase() sem time/day gate; TDD cobrindo MSG-01 a MSG-09
 
+</details>
+
+### 🚧 v1.4 Independent Cron Intervals (In Progress)
+
+**Milestone Goal:** Split the single `CRON_INTERVAL` into 3 independent intervals — one per dispatch type — each with its own `setInterval` and `isRunning` guard, so a slow runs cycle never delays FUP or messages.
+
+#### Phase 8: Independent Cron Intervals
+**Goal**: The scheduler is refactored from one shared interval into three independent intervals — one for runs, one for FUP, one for messages — each with its own env var, its own `setInterval`, and its own `isRunning` guard so no dispatch type can block another
+**Depends on**: Phase 7
+**Requirements**: CRON-01, CRON-02, CRON-03, CRON-04, CRON-05, CRON-06, CRON-07, CRON-08, CRON-09, CRON-10, CRON-11
+**Success Criteria** (what must be TRUE):
+  1. Service fails to start with a clear error if any of `CRON_INTERVAL_RUNS`, `CRON_INTERVAL_FUP`, or `CRON_INTERVAL_MESSAGES` is missing — and `CRON_INTERVAL` is no longer read or validated
+  2. Three independent `setInterval` timers fire at their respective configured intervals, each triggering its own dispatch cycle (`runRunsCycle`, `runFupCycle`, `runMessagesCycle`)
+  3. A slow or hung runs cycle does not delay or block FUP or messages cycles — each has its own `isRunning` guard that only prevents overlap within that same dispatch type
+  4. `.env.example` documents `CRON_INTERVAL_RUNS`, `CRON_INTERVAL_FUP`, and `CRON_INTERVAL_MESSAGES` with no reference to the old `CRON_INTERVAL`
+  5. `docs/vars-schema.md` reflects the new env vars
+**Plans**: TBD
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -147,4 +165,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 4. Database Targeting | v1.1 | 1/1 | Complete | 2026-03-25 |
 | 5. Per-Client Time Controls | v1.1 | 1/1 | Complete | 2026-03-25 |
 | 6. FUP Dispatch | v1.2 | 1/1 | Complete | 2026-03-26 |
-| 7. Messages Dispatch | v1.3 | 1/1 | Complete   | 2026-03-26 |
+| 7. Messages Dispatch | v1.3 | 1/1 | Complete | 2026-03-26 |
+| 8. Independent Cron Intervals | v1.4 | 0/? | Not started | - |
