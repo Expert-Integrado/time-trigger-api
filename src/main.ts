@@ -1,7 +1,13 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.js';
 
-const REQUIRED_ENV_VARS = ['MONGODB_URI', 'CRON_INTERVAL', 'TZ'] as const;
+const REQUIRED_ENV_VARS = [
+  'MONGODB_URI',
+  'CRON_INTERVAL_RUNS',
+  'CRON_INTERVAL_FUP',
+  'CRON_INTERVAL_MESSAGES',
+  'TZ',
+] as const;
 
 export function validateEnv(): void {
   const missing = REQUIRED_ENV_VARS.filter((key) => !process.env[key]);
