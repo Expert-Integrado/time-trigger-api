@@ -9,14 +9,14 @@ Requirements for Independent Cron Intervals milestone.
 
 ### Env Vars
 
-- [ ] **CRON-01**: `CRON_INTERVAL_RUNS` env var controls interval for runs dispatch (in milliseconds)
-- [ ] **CRON-02**: `CRON_INTERVAL_FUP` env var controls interval for FUP dispatch (in milliseconds)
-- [ ] **CRON-03**: `CRON_INTERVAL_MESSAGES` env var controls interval for messages dispatch (in milliseconds)
-- [ ] **CRON-04**: Old `CRON_INTERVAL` env var is removed — no longer read or validated
+- [x] **CRON-01**: `CRON_INTERVAL_RUNS` env var controls interval for runs dispatch (in milliseconds)
+- [x] **CRON-02**: `CRON_INTERVAL_FUP` env var controls interval for FUP dispatch (in milliseconds)
+- [x] **CRON-03**: `CRON_INTERVAL_MESSAGES` env var controls interval for messages dispatch (in milliseconds)
+- [x] **CRON-04**: Old `CRON_INTERVAL` env var is removed — no longer read or validated
 
 ### Independent Scheduling
 
-- [ ] **CRON-05**: Each dispatch type has its own `setInterval` registered via `SchedulerRegistry`
+- [x] **CRON-05**: Each dispatch type has its own `setInterval` registered via `SchedulerRegistry`
 - [x] **CRON-06**: Each dispatch type has its own `isRunning` guard — one slow dispatch does not block others
 - [x] **CRON-07**: Each interval can be different (e.g., messages every 5s, runs every 10s, FUP every 30s)
 
@@ -41,11 +41,11 @@ Requirements for Independent Cron Intervals milestone.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CRON-01 | Phase 8 | Pending |
-| CRON-02 | Phase 8 | Pending |
-| CRON-03 | Phase 8 | Pending |
-| CRON-04 | Phase 8 | Pending |
-| CRON-05 | Phase 8 | Pending |
+| CRON-01 | Phase 8 | Complete |
+| CRON-02 | Phase 8 | Complete |
+| CRON-03 | Phase 8 | Complete |
+| CRON-04 | Phase 8 | Complete |
+| CRON-05 | Phase 8 | Complete |
 | CRON-06 | Phase 8 | Complete |
 | CRON-07 | Phase 8 | Complete |
 | CRON-08 | Phase 8 | Complete |
