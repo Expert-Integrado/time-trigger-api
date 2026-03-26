@@ -17,9 +17,11 @@ describe('RunDispatchService', () => {
     webhooks: Record<string, unknown> | null,
     runs: Record<string, unknown>[],
     fups: Record<string, unknown>[] = [],
+    messages: Record<string, unknown>[] = [],
   ) => {
     const mockRunsFind = { toArray: jest.fn().mockResolvedValue(runs) };
     const mockFupsFind = { toArray: jest.fn().mockResolvedValue(fups) };
+    const mockMessagesFind = { toArray: jest.fn().mockResolvedValue(messages) };
     const collections: Record<
       string,
       { findOne?: jest.Mock; find?: jest.Mock }
@@ -28,6 +30,7 @@ describe('RunDispatchService', () => {
       webhooks: { findOne: jest.fn().mockResolvedValue(webhooks) },
       runs: { find: jest.fn().mockReturnValue(mockRunsFind) },
       fup: { find: jest.fn().mockReturnValue(mockFupsFind) },
+      messages: { find: jest.fn().mockReturnValue(mockMessagesFind) },
     };
     return {
       collection: jest.fn((name: string) => collections[name]),
@@ -52,6 +55,7 @@ describe('RunDispatchService', () => {
           useValue: {
             dispatch: jest.fn().mockResolvedValue(undefined),
             dispatchFup: jest.fn().mockResolvedValue(undefined),
+            dispatchMessage: jest.fn().mockResolvedValue(undefined),
           },
         },
         {
@@ -569,6 +573,174 @@ describe('RunDispatchService', () => {
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('FUP'));
     expect(webhookDispatchService.dispatchFup).not.toHaveBeenCalled();
     expect(webhookDispatchService.dispatch).toHaveBeenCalledTimes(1);
+    jest.restoreAllMocks();
+  });
+
+  // Messages tests
+
+  const eligibleMessage = {
+    _id: 'msg-001',
+    messageStatus: 'pending',
+  };
+
+  const webhooksDocWithMessages = {
+    'Processador de Runs': 'https://hook.example.com',
+    'Gerenciador follow up': 'https://fup.example.com',
+    'mensagens pendentes': 'https://messages.example.com',
+  };
+
+  it('(MSG-01) queries messages collection with { messageStatus: "pending" } — no timestamp condition', async () => {
+    const db = makeDb(
+      withinWindowVars,
+      webhooksDocWithMessages,
+      [],
+      [],
+      [eligibleMessage],
+    );
+    mongoService.db.mockReturnValue(db as unknown as Db);
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+    await service.runCycle();
+
+    const messagesCollectionFind = (db as any)._collections.messages.find;
+    expect(messagesCollectionFind).toHaveBeenCalledWith(
+      expect.objectContaining({ messageStatus: 'pending' }),
+    );
+    // Ensure no timestamp condition is present
+    const filterArg = messagesCollectionFind.mock.calls[0][0];
+    expect(filterArg).not.toHaveProperty('waitUntil');
+    expect(filterArg).not.toHaveProperty('nextInteractionTimestamp');
+    jest.restoreAllMocks();
+  });
+
+  it('(MSG-02) messages dispatched even when currentHour is outside morningLimit/nightLimit', async () => {
+    const db = makeDb(
+      withinWindowVars,
+      webhooksDocWithMessages,
+      [],
+      [],
+      [eligibleMessage],
+    );
+    mongoService.db.mockReturnValue(db as unknown as Db);
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(3); // before morningLimit
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+    await service.runCycle();
+
+    expect(webhookDispatchService.dispatchMessage).toHaveBeenCalledTimes(1);
+    expect(webhookDispatchService.dispatch).not.toHaveBeenCalled();
+    jest.restoreAllMocks();
+  });
+
+  it('(MSG-03) messages dispatched even when currentDay is not in allowedDays', async () => {
+    const restrictedVars = {
+      timeTrigger: {
+        enabled: true,
+        morningLimit: 8,
+        nightLimit: 22,
+        allowedDays: [1, 2, 3, 4, 5], // só dias úteis
+      },
+    };
+    const db = makeDb(
+      restrictedVars,
+      webhooksDocWithMessages,
+      [],
+      [],
+      [eligibleMessage],
+    );
+    mongoService.db.mockReturnValue(db as unknown as Db);
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(0); // domingo — não permitido
+
+    await service.runCycle();
+
+    expect(webhookDispatchService.dispatchMessage).toHaveBeenCalledTimes(1);
+    expect(webhookDispatchService.dispatch).not.toHaveBeenCalled();
+    jest.restoreAllMocks();
+  });
+
+  it('(MSG-02/MSG-03) messages dispatched even when timeTrigger is absent in vars', async () => {
+    const db = makeDb(
+      { botIdentifier: 'x' },
+      webhooksDocWithMessages,
+      [],
+      [],
+      [eligibleMessage],
+    );
+    mongoService.db.mockReturnValue(db as unknown as Db);
+
+    await service.runCycle();
+
+    expect(webhookDispatchService.dispatchMessage).toHaveBeenCalledTimes(1);
+    expect(webhookDispatchService.dispatch).not.toHaveBeenCalled();
+  });
+
+  it('(MSG-09) dispatchMessage called in same processDatabase() call as dispatch and dispatchFup', async () => {
+    const db = makeDb(
+      withinWindowVars,
+      webhooksDocWithMessages,
+      [eligibleRun],
+      [eligibleFup],
+      [eligibleMessage],
+    );
+    mongoService.db.mockReturnValue(db as unknown as Db);
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+    await service.runCycle();
+
+    expect(webhookDispatchService.dispatch).toHaveBeenCalledTimes(1);
+    expect(webhookDispatchService.dispatchFup).toHaveBeenCalledTimes(1);
+    expect(webhookDispatchService.dispatchMessage).toHaveBeenCalledTimes(1);
+    jest.restoreAllMocks();
+  });
+
+  it('mensagens pendentes URL absent → logs warn, skips messages, runs still dispatched', async () => {
+    const webhooksWithoutMessages = {
+      'Processador de Runs': 'https://hook.example.com',
+      'Gerenciador follow up': 'https://fup.example.com',
+    };
+    const db = makeDb(
+      withinWindowVars,
+      webhooksWithoutMessages,
+      [eligibleRun],
+      [],
+      [eligibleMessage],
+    );
+    mongoService.db.mockReturnValue(db as unknown as Db);
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+    const warnSpy = jest
+      .spyOn((service as any).logger, 'warn')
+      .mockImplementation(() => {});
+
+    await service.runCycle();
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('mensagens pendentes'),
+    );
+    expect(webhookDispatchService.dispatchMessage).not.toHaveBeenCalled();
+    expect(webhookDispatchService.dispatch).toHaveBeenCalledTimes(1);
+    jest.restoreAllMocks();
+  });
+
+  it('dispatchMessage called once per eligible message', async () => {
+    const message2 = { _id: 'msg-002', messageStatus: 'pending' };
+    const db = makeDb(
+      withinWindowVars,
+      webhooksDocWithMessages,
+      [],
+      [],
+      [eligibleMessage, message2],
+    );
+    mongoService.db.mockReturnValue(db as unknown as Db);
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+    await service.runCycle();
+
+    expect(webhookDispatchService.dispatchMessage).toHaveBeenCalledTimes(2);
     jest.restoreAllMocks();
   });
 });
