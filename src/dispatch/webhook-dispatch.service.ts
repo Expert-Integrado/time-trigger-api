@@ -77,7 +77,11 @@ export class WebhookDispatchService {
     setTimeout(retryFn, 60_000);
   }
 
-  async dispatchMessage(db: Db, message: Document, webhookUrl: string): Promise<void> {
+  async dispatchMessage(
+    db: Db,
+    message: Document,
+    webhookUrl: string,
+  ): Promise<void> {
     const messageId = message['_id'] as ObjectId;
     const success = await this.post(webhookUrl, message);
 

@@ -166,9 +166,7 @@ export class RunDispatchService {
     }
 
     // DETECT-03: fresh webhooks read every cycle
-    const webhookDoc = await db
-      .collection('webhooks')
-      .findOne<WebhookDoc>({});
+    const webhookDoc = await db.collection('webhooks').findOne<WebhookDoc>({});
     const webhookUrl = webhookDoc?.['Processador de Runs'];
     if (!webhookUrl) {
       this.logger.warn(
@@ -235,9 +233,7 @@ export class RunDispatchService {
       return;
     }
 
-    const webhookDoc = await db
-      .collection('webhooks')
-      .findOne<WebhookDoc>({});
+    const webhookDoc = await db.collection('webhooks').findOne<WebhookDoc>({});
     const fupWebhookUrl = webhookDoc?.['Gerenciador follow up'] as
       | string
       | undefined;
@@ -265,9 +261,7 @@ export class RunDispatchService {
     const db: Db = this.mongoService.db(dbName);
 
     // MSG-01/MSG-02/MSG-03: messages — NO time gate, NO day gate
-    const webhookDoc = await db
-      .collection('webhooks')
-      .findOne<WebhookDoc>({});
+    const webhookDoc = await db.collection('webhooks').findOne<WebhookDoc>({});
     const messagesWebhookUrl = webhookDoc?.['mensagens pendentes'];
     if (!messagesWebhookUrl) {
       this.logger.warn(
