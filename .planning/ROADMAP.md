@@ -129,7 +129,10 @@ Plans:
   2. An eligible message document is POSTed to the "mensagens pendentes" webhook URL read from the `webhooks` collection; on success, `messageStatus` is updated atomically to `"processing"` via `findOneAndUpdate` with `{ messageStatus: "pending" }` as the filter — a concurrent cycle cannot dispatch the same message twice
   3. A failed message POST retries once after 1 minute; if the retry also fails, the document remains as `messageStatus: "pending"` and is picked up in the next cycle
   4. Messages dispatch runs inside `processDatabase()` in the same cron cycle as runs and FUP — no separate cron, scheduler, or module is required
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 07-01-PLAN.md — dispatchMessage() em WebhookDispatchService + bloco messages em processDatabase() sem time/day gate; TDD cobrindo MSG-01 a MSG-09
 
 ## Progress
 
@@ -144,4 +147,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 4. Database Targeting | v1.1 | 1/1 | Complete | 2026-03-25 |
 | 5. Per-Client Time Controls | v1.1 | 1/1 | Complete | 2026-03-25 |
 | 6. FUP Dispatch | v1.2 | 1/1 | Complete | 2026-03-26 |
-| 7. Messages Dispatch | v1.3 | 0/? | Not started | - |
+| 7. Messages Dispatch | v1.3 | 0/1 | Not started | - |
