@@ -77,6 +77,42 @@ export class WebhookDispatchService {
     setTimeout(retryFn, 60_000);
   }
 
+  async dispatchMessage(db: Db, message: Document, webhookUrl: string): Promise<void> {
+    const messageId = message['_id'] as ObjectId;
+    const success = await this.post(webhookUrl, message);
+
+    if (success) {
+      const result = await db
+        .collection('messages')
+        .findOneAndUpdate(
+          { _id: messageId, messageStatus: 'pending' },
+          { $set: { messageStatus: 'processing' } },
+        );
+      if (!result) {
+        this.logger.warn(
+          `Message ${String(messageId)} already claimed by another cycle`,
+        );
+      }
+      return;
+    }
+
+    // MSG-07: single non-blocking retry after 60s
+    const retryFn = (): void => {
+      void this.post(webhookUrl, message).then(async (retrySuccess) => {
+        if (retrySuccess) {
+          await db
+            .collection('messages')
+            .findOneAndUpdate(
+              { _id: messageId, messageStatus: 'pending' },
+              { $set: { messageStatus: 'processing' } },
+            );
+        }
+        // MSG-08: if retry fails, leave message as 'pending' — next cycle picks up
+      });
+    };
+    setTimeout(retryFn, 60_000);
+  }
+
   private async post(url: string, run: Document): Promise<boolean> {
     try {
       // DISP-06: explicit 10s timeout prevents a hanging webhook from stalling the cycle

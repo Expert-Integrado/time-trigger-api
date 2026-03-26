@@ -273,3 +273,135 @@ describe('WebhookDispatchService - dispatchFup', () => {
     expect(setTimeout).toHaveBeenCalledWith(expect.any(Function), 60_000);
   });
 });
+
+describe('WebhookDispatchService - dispatchMessage', () => {
+  let service: WebhookDispatchService;
+  let mockMsgCollection: { findOneAndUpdate: jest.Mock };
+  let mockMsgDb: jest.Mocked<Pick<Db, 'collection'>>;
+  let fetchMock: jest.Mock;
+
+  const message: Document = {
+    _id: new ObjectId('cccccccccccccccccccccccc'),
+    messageStatus: 'pending',
+  };
+  const messagesWebhookUrl = 'https://webhook.example.com/messages';
+
+  beforeEach(async () => {
+    fetchMock = jest.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    jest.useFakeTimers({ doNotFake: [] });
+    jest.spyOn(global, 'setTimeout');
+
+    mockMsgCollection = { findOneAndUpdate: jest.fn().mockResolvedValue(message) };
+    mockMsgDb = {
+      collection: jest.fn().mockReturnValue(mockMsgCollection),
+    } as unknown as jest.Mocked<Pick<Db, 'collection'>>;
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [WebhookDispatchService],
+    }).compile();
+
+    service = module.get<WebhookDispatchService>(WebhookDispatchService);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('(MSG-04) POSTs message document as JSON to webhookUrl', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true });
+
+    await service.dispatchMessage(mockMsgDb as unknown as Db, message, messagesWebhookUrl);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      messagesWebhookUrl,
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+        body: JSON.stringify(message),
+      }),
+    );
+  });
+
+  it('(MSG-04) includes AbortSignal.timeout(10000)', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true });
+
+    await service.dispatchMessage(mockMsgDb as unknown as Db, message, messagesWebhookUrl);
+
+    const callOptions = fetchMock.mock.calls[0][1];
+    expect(callOptions.signal).toBeDefined();
+  });
+
+  it('(MSG-05) calls findOneAndUpdate on messages collection when POST succeeds', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true });
+
+    await service.dispatchMessage(mockMsgDb as unknown as Db, message, messagesWebhookUrl);
+
+    expect(mockMsgDb.collection).toHaveBeenCalledWith('messages');
+    expect(mockMsgCollection.findOneAndUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it('(MSG-06) findOneAndUpdate filter includes { _id: messageId, messageStatus: "pending" }', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true });
+
+    await service.dispatchMessage(mockMsgDb as unknown as Db, message, messagesWebhookUrl);
+
+    const filterArg = mockMsgCollection.findOneAndUpdate.mock.calls[0][0];
+    expect(filterArg).toMatchObject({ _id: message._id, messageStatus: 'pending' });
+  });
+
+  it('(MSG-05) findOneAndUpdate $set contains { messageStatus: "processing" }', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true });
+
+    await service.dispatchMessage(mockMsgDb as unknown as Db, message, messagesWebhookUrl);
+
+    const updateArg = mockMsgCollection.findOneAndUpdate.mock.calls[0][1];
+    expect(updateArg.$set.messageStatus).toBe('processing');
+  });
+
+  it('(MSG-07) schedules retry via setTimeout(60000) when POST fails', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: false });
+
+    await service.dispatchMessage(mockMsgDb as unknown as Db, message, messagesWebhookUrl);
+
+    expect(setTimeout).toHaveBeenCalledWith(expect.any(Function), 60_000);
+    expect(mockMsgCollection.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it('(MSG-07) retry calls findOneAndUpdate when retry POST succeeds', async () => {
+    fetchMock
+      .mockResolvedValueOnce({ ok: false }) // initial fails
+      .mockResolvedValueOnce({ ok: true }); // retry succeeds
+
+    await service.dispatchMessage(mockMsgDb as unknown as Db, message, messagesWebhookUrl);
+
+    await jest.runAllTimersAsync();
+
+    expect(mockMsgCollection.findOneAndUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it('(MSG-08) does NOT call findOneAndUpdate when retry also fails', async () => {
+    fetchMock
+      .mockResolvedValueOnce({ ok: false }) // initial fails
+      .mockResolvedValueOnce({ ok: false }); // retry also fails
+
+    await service.dispatchMessage(mockMsgDb as unknown as Db, message, messagesWebhookUrl);
+    await jest.runAllTimersAsync();
+
+    expect(mockMsgCollection.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it('fetch throw treated as failure (schedules retry, does not propagate)', async () => {
+    fetchMock
+      .mockRejectedValueOnce(new DOMException('signal timed out', 'AbortError'))
+      .mockResolvedValueOnce({ ok: false }); // retry also fails
+
+    await expect(
+      service.dispatchMessage(mockMsgDb as unknown as Db, message, messagesWebhookUrl),
+    ).resolves.not.toThrow();
+    expect(setTimeout).toHaveBeenCalledWith(expect.any(Function), 60_000);
+  });
+});
