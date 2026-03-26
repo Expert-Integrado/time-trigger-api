@@ -2,6 +2,22 @@
 
 Campos que devem existir na coleção `vars` de cada banco para o Time Trigger funcionar.
 
+## Env Vars da API
+
+Variáveis de ambiente necessárias para iniciar o serviço:
+
+| Variável | Obrigatório | Descrição |
+|----------|-------------|-----------|
+| `MONGODB_URI` | Sim | String de conexão MongoDB (replica set) |
+| `CRON_INTERVAL_RUNS` | Sim | Intervalo em ms para ciclo de runs + FUPs (ex: 30000) |
+| `CRON_INTERVAL_FUP` | Sim | Intervalo em ms para ciclo independente de FUPs (ex: 15000) |
+| `CRON_INTERVAL_MESSAGES` | Sim | Intervalo em ms para ciclo de mensagens pendentes (ex: 5000) |
+| `TZ` | Sim | Timezone para cálculo de morningLimit/nightLimit (use `America/Sao_Paulo`) |
+| `PORT` | Não | Porta HTTP (padrão: 3000) |
+| `TARGET_DATABASES` | Não | Filtro de bancos (`*` ou lista separada por vírgula) |
+
+> **Nota:** A variável `CRON_INTERVAL` (usada em versões anteriores) foi removida na v1.4. Use as 3 variáveis independentes acima.
+
 ## Campos Obrigatórios
 
 ```json
