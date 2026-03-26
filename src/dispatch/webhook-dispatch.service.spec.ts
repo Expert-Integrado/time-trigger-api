@@ -139,3 +139,137 @@ describe('WebhookDispatchService', () => {
     expect(setTimeout).toHaveBeenCalledWith(expect.any(Function), 60_000);
   });
 });
+
+describe('WebhookDispatchService - dispatchFup', () => {
+  let service: WebhookDispatchService;
+  let mockFupCollection: { findOneAndUpdate: jest.Mock };
+  let mockFupDb: jest.Mocked<Pick<Db, 'collection'>>;
+  let fetchMock: jest.Mock;
+
+  const fup: Document = {
+    _id: new ObjectId('bbbbbbbbbbbbbbbbbbbbbbbb'),
+    status: 'on',
+    nextInteractionTimestamp: 1_000_000,
+  };
+  const fupWebhookUrl = 'https://webhook.example.com/fup';
+
+  beforeEach(async () => {
+    fetchMock = jest.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    jest.useFakeTimers({ doNotFake: [] });
+    jest.spyOn(global, 'setTimeout');
+
+    mockFupCollection = { findOneAndUpdate: jest.fn().mockResolvedValue(fup) };
+    mockFupDb = {
+      collection: jest.fn().mockReturnValue(mockFupCollection),
+    } as unknown as jest.Mocked<Pick<Db, 'collection'>>;
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [WebhookDispatchService],
+    }).compile();
+
+    service = module.get<WebhookDispatchService>(WebhookDispatchService);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('(FUP-04) POSTs the fup document as JSON to the webhookUrl', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true });
+
+    await service.dispatchFup(mockFupDb as unknown as Db, fup, fupWebhookUrl);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      fupWebhookUrl,
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+        body: JSON.stringify(fup),
+      }),
+    );
+  });
+
+  it('(FUP-04) includes AbortSignal.timeout(10000) in the fetch options', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true });
+
+    await service.dispatchFup(mockFupDb as unknown as Db, fup, fupWebhookUrl);
+
+    const callOptions = fetchMock.mock.calls[0][1];
+    expect(callOptions.signal).toBeDefined();
+  });
+
+  it('(FUP-05) calls findOneAndUpdate on fup collection when POST succeeds', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true });
+
+    await service.dispatchFup(mockFupDb as unknown as Db, fup, fupWebhookUrl);
+
+    expect(mockFupDb.collection).toHaveBeenCalledWith('fup');
+    expect(mockFupCollection.findOneAndUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it('(FUP-06) findOneAndUpdate filter includes { _id: fupId, status: "on" }', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true });
+
+    await service.dispatchFup(mockFupDb as unknown as Db, fup, fupWebhookUrl);
+
+    const filterArg = mockFupCollection.findOneAndUpdate.mock.calls[0][0];
+    expect(filterArg).toMatchObject({ _id: fup._id, status: 'on' });
+  });
+
+  it('(FUP-05) findOneAndUpdate $set contains { status: "queued" } (no queuedAt)', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true });
+
+    await service.dispatchFup(mockFupDb as unknown as Db, fup, fupWebhookUrl);
+
+    const updateArg = mockFupCollection.findOneAndUpdate.mock.calls[0][1];
+    expect(updateArg.$set.status).toBe('queued');
+    expect(updateArg.$set.queuedAt).toBeUndefined();
+  });
+
+  it('(FUP-07) schedules retry via setTimeout(60000) when POST fails', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: false });
+
+    await service.dispatchFup(mockFupDb as unknown as Db, fup, fupWebhookUrl);
+
+    expect(setTimeout).toHaveBeenCalledWith(expect.any(Function), 60_000);
+    expect(mockFupCollection.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it('(FUP-08) retry calls findOneAndUpdate when retry POST succeeds', async () => {
+    fetchMock
+      .mockResolvedValueOnce({ ok: false }) // initial fails
+      .mockResolvedValueOnce({ ok: true }); // retry succeeds
+
+    await service.dispatchFup(mockFupDb as unknown as Db, fup, fupWebhookUrl);
+
+    await jest.runAllTimersAsync();
+
+    expect(mockFupCollection.findOneAndUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it('(FUP-08) does NOT call findOneAndUpdate when retry also fails', async () => {
+    fetchMock
+      .mockResolvedValueOnce({ ok: false }) // initial fails
+      .mockResolvedValueOnce({ ok: false }); // retry also fails
+
+    await service.dispatchFup(mockFupDb as unknown as Db, fup, fupWebhookUrl);
+    await jest.runAllTimersAsync();
+
+    expect(mockFupCollection.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it('fetch throw treats as failure (schedules retry, does not propagate)', async () => {
+    fetchMock
+      .mockRejectedValueOnce(new DOMException('signal timed out', 'AbortError'))
+      .mockResolvedValueOnce({ ok: false }); // retry also fails
+
+    await expect(
+      service.dispatchFup(mockFupDb as unknown as Db, fup, fupWebhookUrl),
+    ).resolves.not.toThrow();
+    expect(setTimeout).toHaveBeenCalledWith(expect.any(Function), 60_000);
+  });
+});

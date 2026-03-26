@@ -41,6 +41,42 @@ export class WebhookDispatchService {
     setTimeout(retryFn, 60_000);
   }
 
+  async dispatchFup(db: Db, fup: Document, webhookUrl: string): Promise<void> {
+    const fupId = fup['_id'] as ObjectId;
+    const success = await this.post(webhookUrl, fup);
+
+    if (success) {
+      const result = await db
+        .collection('fup')
+        .findOneAndUpdate(
+          { _id: fupId, status: 'on' },
+          { $set: { status: 'queued' } },
+        );
+      if (!result) {
+        this.logger.warn(
+          `FUP ${String(fupId)} already claimed by another cycle`,
+        );
+      }
+      return;
+    }
+
+    // FUP-07: single non-blocking retry after 60s
+    const retryFn = (): void => {
+      void this.post(webhookUrl, fup).then(async (retrySuccess) => {
+        if (retrySuccess) {
+          await db
+            .collection('fup')
+            .findOneAndUpdate(
+              { _id: fupId, status: 'on' },
+              { $set: { status: 'queued' } },
+            );
+        }
+        // FUP-08: if retry fails, leave fup as 'on' — next cycle picks up
+      });
+    };
+    setTimeout(retryFn, 60_000);
+  }
+
   private async post(url: string, run: Document): Promise<boolean> {
     try {
       // DISP-06: explicit 10s timeout prevents a hanging webhook from stalling the cycle
