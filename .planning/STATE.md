@@ -1,30 +1,32 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.4
-milestone_name: Independent Cron Intervals
-status: v1.4 milestone complete
-stopped_at: Completed 08-02-PLAN.md
-last_updated: "2026-03-29T21:03:09.853Z"
+milestone: v1.5
+milestone_name: Rate Limiting and Message-Run Dependency
+status: Defining requirements
+stopped_at: Milestone v1.5 started
+last_updated: "2026-03-29T21:30:00.000Z"
 progress:
-  total_phases: 1
-  completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  total_phases: null
+  completed_phases: 0
+  total_plans: null
+  completed_plans: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-26)
+See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Runs, FUPs, and messages must be detected and dispatched to their webhooks reliably — no missed dispatches, no duplicates.
-**Current focus:** Phase 08 — independent-cron-intervals
+**Current focus:** Milestone v1.5 — Rate Limiting and Message-Run Dependency
 
 ## Current Position
 
-Phase: 08
-Plan: Not started
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-29 — Milestone v1.5 started
 
 ## Performance Metrics
 

@@ -31,6 +31,15 @@ The service now runs 3 independent cron intervals — one for runs dispatch, one
 - Docker containerization with TZ=America/Sao_Paulo
 - Health endpoint for monitoring
 
+## Current Milestone: v1.5 Rate Limiting and Message-Run Dependency
+
+**Goal:** Add per-database rate limiting for webhook dispatch and implement message-run dependency with automatic timeout recovery
+
+**Target features:**
+- Per-database rate limiting: 10 webhooks per dispatch type per cycle (configurable via env var)
+- Message-run dependency: runs wait for pending messages (same botIdentifier + chatDataId) to complete before dispatch
+- Automatic timeout recovery: messages stuck in "processing" for >10 minutes return to "pending"
+
 ## Requirements
 
 ### Validated
@@ -61,7 +70,9 @@ The service now runs 3 independent cron intervals — one for runs dispatch, one
 
 ### Active
 
-(No active requirements — ready for next milestone planning)
+- [ ] Per-database rate limiting for webhook dispatch (configurable limit per dispatch type)
+- [ ] Message-run dependency based on botIdentifier + chatDataId
+- [ ] Automatic timeout recovery for stuck messages (>10 min in "processing")
 
 ### Out of Scope
 
@@ -130,4 +141,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-29 after v1.4 milestone complete*
+*Last updated: 2026-03-29 after v1.5 milestone started*
