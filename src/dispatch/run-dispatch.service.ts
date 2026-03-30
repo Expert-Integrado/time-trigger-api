@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MongoService } from '../mongo/mongo.service.js';
 import { DatabaseScanService } from '../database/database-scan.service.js';
 import { WebhookDispatchService } from './webhook-dispatch.service.js';
+import { MessageCheckService } from './message-check.service.js';
 import { Db, Document } from 'mongodb';
 
 interface TimeTriggerConfig {
@@ -45,6 +46,7 @@ export class RunDispatchService {
     private readonly mongoService: MongoService,
     private readonly databaseScanService: DatabaseScanService,
     private readonly webhookDispatchService: WebhookDispatchService,
+    private readonly messageCheckService: MessageCheckService,
   ) {}
 
   async runRunsCycle(): Promise<void> {
@@ -201,6 +203,22 @@ export class RunDispatchService {
             `[${dbName}] Rate limit reached for runs (${counterRuns}/${this.rateLimitRuns}) — skipping remaining items`,
           );
           break;
+        }
+        // DEP-02, DEP-03, DEP-04, DEP-05: dependency guard — block run if matching message is processing
+        const botIdentifier = run['botIdentifier'] as string | undefined;
+        const chatDataId = run['chatDataId'] as string | undefined;
+        if (botIdentifier && chatDataId) {
+          const blocked = await this.messageCheckService.hasProcessingMessage(
+            db,
+            botIdentifier,
+            chatDataId,
+          );
+          if (blocked) {
+            this.logger.warn(
+              `[${dbName}] Run ${String(run['_id'])} blocked — message still processing (chatDataId: ${chatDataId}, botIdentifier: ${botIdentifier})`,
+            );
+            continue;
+          }
         }
         const claimed = await this.webhookDispatchService.dispatch(
           db,

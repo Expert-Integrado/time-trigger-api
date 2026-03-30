@@ -94,12 +94,15 @@ export class WebhookDispatchService {
     const success = await this.post(webhookUrl, message);
 
     if (success) {
-      const result = await db
-        .collection('messages')
-        .findOneAndUpdate(
-          { _id: messageId, messageStatus: 'pending' },
-          { $set: { messageStatus: 'processing' } },
-        );
+      const result = await db.collection('messages').findOneAndUpdate(
+        { _id: messageId, messageStatus: 'pending' },
+        {
+          $set: {
+            messageStatus: 'processing',
+            processingStartedAt: new Date(),
+          },
+        },
+      );
       if (!result) {
         this.logger.warn(
           `Message ${String(messageId)} already claimed by another cycle`,
@@ -113,12 +116,15 @@ export class WebhookDispatchService {
     const retryFn = (): void => {
       void this.post(webhookUrl, message).then(async (retrySuccess) => {
         if (retrySuccess) {
-          await db
-            .collection('messages')
-            .findOneAndUpdate(
-              { _id: messageId, messageStatus: 'pending' },
-              { $set: { messageStatus: 'processing' } },
-            );
+          await db.collection('messages').findOneAndUpdate(
+            { _id: messageId, messageStatus: 'pending' },
+            {
+              $set: {
+                messageStatus: 'processing',
+                processingStartedAt: new Date(),
+              },
+            },
+          );
         }
         // MSG-08: if retry fails, leave message as 'pending' — next cycle picks up
       });
