@@ -5,7 +5,7 @@ import { Db, Document, ObjectId } from 'mongodb';
 export class WebhookDispatchService {
   private readonly logger = new Logger(WebhookDispatchService.name);
 
-  async dispatch(db: Db, run: Document, webhookUrl: string): Promise<void> {
+  async dispatch(db: Db, run: Document, webhookUrl: string): Promise<boolean> {
     const runId = run['_id'] as ObjectId;
     const success = await this.post(webhookUrl, run);
 
@@ -20,8 +20,9 @@ export class WebhookDispatchService {
         this.logger.warn(
           `Run ${String(runId)} already claimed by another cycle`,
         );
+        return false;
       }
-      return;
+      return true;
     }
 
     // DISP-04: single non-blocking retry after 60s
@@ -39,9 +40,14 @@ export class WebhookDispatchService {
       });
     };
     setTimeout(retryFn, 60_000);
+    return false;
   }
 
-  async dispatchFup(db: Db, fup: Document, webhookUrl: string): Promise<void> {
+  async dispatchFup(
+    db: Db,
+    fup: Document,
+    webhookUrl: string,
+  ): Promise<boolean> {
     const fupId = fup['_id'] as ObjectId;
     const success = await this.post(webhookUrl, fup);
 
@@ -56,8 +62,9 @@ export class WebhookDispatchService {
         this.logger.warn(
           `FUP ${String(fupId)} already claimed by another cycle`,
         );
+        return false;
       }
-      return;
+      return true;
     }
 
     // FUP-07: single non-blocking retry after 60s
@@ -75,13 +82,14 @@ export class WebhookDispatchService {
       });
     };
     setTimeout(retryFn, 60_000);
+    return false;
   }
 
   async dispatchMessage(
     db: Db,
     message: Document,
     webhookUrl: string,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const messageId = message['_id'] as ObjectId;
     const success = await this.post(webhookUrl, message);
 
@@ -96,8 +104,9 @@ export class WebhookDispatchService {
         this.logger.warn(
           `Message ${String(messageId)} already claimed by another cycle`,
         );
+        return false;
       }
-      return;
+      return true;
     }
 
     // MSG-07: single non-blocking retry after 60s
@@ -115,6 +124,7 @@ export class WebhookDispatchService {
       });
     };
     setTimeout(retryFn, 60_000);
+    return false;
   }
 
   private async post(url: string, run: Document): Promise<boolean> {
