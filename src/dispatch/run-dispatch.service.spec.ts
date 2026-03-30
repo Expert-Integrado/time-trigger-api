@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RunDispatchService } from './run-dispatch.service.js';
 import { WebhookDispatchService } from './webhook-dispatch.service.js';
-import { MessageCheckService } from './message-check.service.js';
 import { MongoService } from '../mongo/mongo.service.js';
 import { DatabaseScanService } from '../database/database-scan.service.js';
 import { Db } from 'mongodb';
@@ -11,7 +10,6 @@ describe('RunDispatchService', () => {
   let webhookDispatchService: jest.Mocked<WebhookDispatchService>;
   let mongoService: jest.Mocked<MongoService>;
   let databaseScanService: jest.Mocked<DatabaseScanService>;
-  let messageCheckService: jest.Mocked<MessageCheckService>;
 
   // Helpers for building mock Db handles
   const makeDb = (
@@ -35,6 +33,7 @@ describe('RunDispatchService', () => {
       messages: {
         find: jest.fn().mockReturnValue(mockMessagesFind),
         findOne: jest.fn().mockResolvedValue(null),
+        updateMany: jest.fn().mockResolvedValue({ modifiedCount: 0 }),
       },
     };
     return {
@@ -73,12 +72,6 @@ describe('RunDispatchService', () => {
             getEligibleDatabases: jest.fn().mockResolvedValue(['test-db']),
           },
         },
-        {
-          provide: MessageCheckService,
-          useValue: {
-            hasProcessingMessage: jest.fn().mockResolvedValue(false),
-          },
-        },
       ],
     }).compile();
 
@@ -86,7 +79,6 @@ describe('RunDispatchService', () => {
     webhookDispatchService = module.get(WebhookDispatchService);
     mongoService = module.get(MongoService);
     databaseScanService = module.get(DatabaseScanService);
-    messageCheckService = module.get(MessageCheckService);
   });
 
   const withinWindowVars = {
@@ -943,12 +935,6 @@ describe('RunDispatchService', () => {
               getEligibleDatabases: jest.fn().mockResolvedValue(['test-db']),
             },
           },
-          {
-            provide: MessageCheckService,
-            useValue: {
-              hasProcessingMessage: jest.fn().mockResolvedValue(false),
-            },
-          },
         ],
       }).compile();
 
@@ -1022,12 +1008,8 @@ describe('RunDispatchService', () => {
     });
 
     it('(RATE-05) stops dispatching runs when limit is reached', async () => {
-      const {
-        service: svc,
-        webhookSvc,
-        mongoSvc,
-        scanSvc,
-      } = await buildServiceWithLimit({ RATE_LIMIT_RUNS: '2' });
+      const { service: svc, webhookSvc, mongoSvc, scanSvc } =
+        await buildServiceWithLimit({ RATE_LIMIT_RUNS: '2' });
 
       webhookSvc.dispatch.mockResolvedValue(true);
       const runs = [
@@ -1062,12 +1044,8 @@ describe('RunDispatchService', () => {
     });
 
     it('(RATE-05) stops dispatching FUP when limit is reached in processDatabaseRuns', async () => {
-      const {
-        service: svc,
-        webhookSvc,
-        mongoSvc,
-        scanSvc,
-      } = await buildServiceWithLimit({ RATE_LIMIT_FUP: '1' });
+      const { service: svc, webhookSvc, mongoSvc, scanSvc } =
+        await buildServiceWithLimit({ RATE_LIMIT_FUP: '1' });
 
       webhookSvc.dispatchFup.mockResolvedValue(true);
       const fups = [
@@ -1094,12 +1072,8 @@ describe('RunDispatchService', () => {
     });
 
     it('(RATE-05) stops dispatching messages when limit is reached', async () => {
-      const {
-        service: svc,
-        webhookSvc,
-        mongoSvc,
-        scanSvc,
-      } = await buildServiceWithLimit({ RATE_LIMIT_MESSAGES: '2' });
+      const { service: svc, webhookSvc, mongoSvc, scanSvc } =
+        await buildServiceWithLimit({ RATE_LIMIT_MESSAGES: '2' });
 
       webhookSvc.dispatchMessage.mockResolvedValue(true);
       const messages = [
@@ -1114,13 +1088,7 @@ describe('RunDispatchService', () => {
         'Gerenciador follow up': 'https://fup.example.com',
         'mensagens pendentes': 'https://messages.example.com',
       };
-      const db = makeDb(
-        withinWindowVars,
-        webhooksWithMessages,
-        [],
-        [],
-        messages,
-      );
+      const db = makeDb(withinWindowVars, webhooksWithMessages, [], [], messages);
       mongoSvc.db.mockReturnValue(db as unknown as Db);
       scanSvc.getEligibleDatabases.mockResolvedValue(['test-db']);
       const warnSpy = jest
@@ -1137,12 +1105,8 @@ describe('RunDispatchService', () => {
     });
 
     it('(RATE-01) each database gets independent counters — one DB hitting limit does not affect another', async () => {
-      const {
-        service: svc,
-        webhookSvc,
-        mongoSvc,
-        scanSvc,
-      } = await buildServiceWithLimit({ RATE_LIMIT_RUNS: '1' });
+      const { service: svc, webhookSvc, mongoSvc, scanSvc } =
+        await buildServiceWithLimit({ RATE_LIMIT_RUNS: '1' });
 
       webhookSvc.dispatch.mockResolvedValue(true);
 
@@ -1164,8 +1128,12 @@ describe('RunDispatchService', () => {
       });
       jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
       jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
-      jest.spyOn((svc as any).logger, 'warn').mockImplementation(() => {});
-      jest.spyOn((svc as any).logger, 'log').mockImplementation(() => {});
+      jest
+        .spyOn((svc as any).logger, 'warn')
+        .mockImplementation(() => {});
+      jest
+        .spyOn((svc as any).logger, 'log')
+        .mockImplementation(() => {});
 
       await svc.runRunsCycle();
 
@@ -1175,12 +1143,8 @@ describe('RunDispatchService', () => {
     });
 
     it('(RATE-07) counters reset to zero on each new cycle', async () => {
-      const {
-        service: svc,
-        webhookSvc,
-        mongoSvc,
-        scanSvc,
-      } = await buildServiceWithLimit({ RATE_LIMIT_RUNS: '2' });
+      const { service: svc, webhookSvc, mongoSvc, scanSvc } =
+        await buildServiceWithLimit({ RATE_LIMIT_RUNS: '2' });
 
       webhookSvc.dispatch.mockResolvedValue(true);
       const runs = [
@@ -1193,8 +1157,12 @@ describe('RunDispatchService', () => {
       scanSvc.getEligibleDatabases.mockResolvedValue(['test-db']);
       jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
       jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
-      jest.spyOn((svc as any).logger, 'warn').mockImplementation(() => {});
-      jest.spyOn((svc as any).logger, 'log').mockImplementation(() => {});
+      jest
+        .spyOn((svc as any).logger, 'warn')
+        .mockImplementation(() => {});
+      jest
+        .spyOn((svc as any).logger, 'log')
+        .mockImplementation(() => {});
 
       // First cycle: dispatch called 2 times (limit=2, 3 available)
       await svc.runRunsCycle();
@@ -1227,12 +1195,8 @@ describe('RunDispatchService', () => {
     });
 
     it('(D-11) logs warn when rate limit is reached', async () => {
-      const {
-        service: svc,
-        webhookSvc,
-        mongoSvc,
-        scanSvc,
-      } = await buildServiceWithLimit({ RATE_LIMIT_RUNS: '1' });
+      const { service: svc, webhookSvc, mongoSvc, scanSvc } =
+        await buildServiceWithLimit({ RATE_LIMIT_RUNS: '1' });
 
       webhookSvc.dispatch.mockResolvedValue(true);
       const runs = [
@@ -1247,81 +1211,211 @@ describe('RunDispatchService', () => {
       const warnSpy = jest
         .spyOn((svc as any).logger, 'warn')
         .mockImplementation(() => {});
-      jest.spyOn((svc as any).logger, 'log').mockImplementation(() => {});
+      jest
+        .spyOn((svc as any).logger, 'log')
+        .mockImplementation(() => {});
 
       await svc.runRunsCycle();
 
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'Rate limit reached for runs (1/1) — skipping remaining items',
-        ),
+        expect.stringContaining('Rate limit reached for runs (1/1) — skipping remaining items'),
       );
       jest.restoreAllMocks();
     });
   });
 
-  describe('Message-Run Dependency (DEP-02, DEP-03, DEP-04, DEP-05)', () => {
-    it('(DEP-02/DEP-03) skips run when processing message exists for same botIdentifier+chatDataId', async () => {
-      const run = {
-        _id: 'run-001',
-        runStatus: 'waiting',
-        waitUntil: 1,
-        botIdentifier: 'bot-x',
-        chatDataId: 'chat-y',
+  // ---- runRecoveryCycle — timeout recovery tests ----
+
+  describe('runRecoveryCycle — timeout recovery', () => {
+    // Rebuild makeDb with updateMany on messages
+    const makeDbWithRecovery = (
+      vars: Record<string, unknown> | null,
+      webhooks: Record<string, unknown> | null,
+      runs: Record<string, unknown>[] = [],
+      fups: Record<string, unknown>[] = [],
+      messages: Record<string, unknown>[] = [],
+      updateManyResult: { modifiedCount: number } = { modifiedCount: 0 },
+    ) => {
+      const mockRunsFind = { toArray: jest.fn().mockResolvedValue(runs) };
+      const mockFupsFind = { toArray: jest.fn().mockResolvedValue(fups) };
+      const mockMessagesFind = {
+        toArray: jest.fn().mockResolvedValue(messages),
       };
-      const db = makeDb(withinWindowVars, webhooksDoc, [run]);
-      mongoService.db.mockReturnValue(db as unknown as Db);
-      messageCheckService.hasProcessingMessage.mockResolvedValue(true);
-      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
-      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
-
-      await service.runRunsCycle();
-
-      expect(webhookDispatchService.dispatch).not.toHaveBeenCalled();
-      jest.restoreAllMocks();
-    });
-
-    it('(DEP-03) dispatches run normally when no processing message exists', async () => {
-      const run = {
-        _id: 'run-002',
-        runStatus: 'waiting',
-        waitUntil: 1,
-        botIdentifier: 'bot-x',
-        chatDataId: 'chat-y',
+      const collections: Record<string, Record<string, jest.Mock>> = {
+        vars: { findOne: jest.fn().mockResolvedValue(vars) },
+        webhooks: { findOne: jest.fn().mockResolvedValue(webhooks) },
+        runs: { find: jest.fn().mockReturnValue(mockRunsFind) },
+        fup: { find: jest.fn().mockReturnValue(mockFupsFind) },
+        messages: {
+          find: jest.fn().mockReturnValue(mockMessagesFind),
+          findOne: jest.fn().mockResolvedValue(null),
+          updateMany: jest.fn().mockResolvedValue(updateManyResult),
+        },
       };
-      const db = makeDb(withinWindowVars, webhooksDoc, [run]);
+      return {
+        collection: jest.fn((name: string) => collections[name]),
+        _collections: collections,
+      } as unknown as Db & { _collections: typeof collections };
+    };
+
+    it('(TOUT-01) resets processing messages older than timeout to pending', async () => {
+      const db = makeDbWithRecovery(null, null, [], [], [], {
+        modifiedCount: 0,
+      });
       mongoService.db.mockReturnValue(db as unknown as Db);
-      messageCheckService.hasProcessingMessage.mockResolvedValue(false);
-      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
-      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
 
-      await service.runRunsCycle();
+      await service.runRecoveryCycle();
 
-      expect(webhookDispatchService.dispatch).toHaveBeenCalledWith(
-        expect.anything(),
-        run,
-        expect.any(String),
+      const updateMany = (db as any)._collections.messages.updateMany;
+      expect(updateMany).toHaveBeenCalledWith(
+        {
+          messageStatus: 'processing',
+          processingStartedAt: { $lte: expect.any(Date) },
+        },
+        { $set: { messageStatus: 'pending' } },
       );
-      jest.restoreAllMocks();
     });
 
-    it('(DEP-04) dispatches run without dependency check when botIdentifier or chatDataId is absent', async () => {
-      const run = {
-        _id: 'run-003',
-        runStatus: 'waiting',
-        waitUntil: 1,
-        // no botIdentifier, no chatDataId
-      };
-      const db = makeDb(withinWindowVars, webhooksDoc, [run]);
+    it('(TOUT-04) filter uses only $lte — no $exists guard', async () => {
+      const db = makeDbWithRecovery(null, null, [], [], [], {
+        modifiedCount: 0,
+      });
       mongoService.db.mockReturnValue(db as unknown as Db);
-      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
-      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
 
-      await service.runRunsCycle();
+      await service.runRecoveryCycle();
 
-      expect(messageCheckService.hasProcessingMessage).not.toHaveBeenCalled();
-      expect(webhookDispatchService.dispatch).toHaveBeenCalled();
-      jest.restoreAllMocks();
+      const updateMany = (db as any)._collections.messages.updateMany;
+      const filter = updateMany.mock.calls[0][0];
+      expect(filter.processingStartedAt['$exists']).toBeUndefined();
+    });
+
+    it('(TOUT-02) default timeout is 10 minutes', async () => {
+      const db = makeDbWithRecovery(null, null, [], [], [], {
+        modifiedCount: 0,
+      });
+      mongoService.db.mockReturnValue(db as unknown as Db);
+
+      const before = Date.now();
+      await service.runRecoveryCycle();
+      const after = Date.now();
+
+      const updateMany = (db as any)._collections.messages.updateMany;
+      const filter = updateMany.mock.calls[0][0];
+      const cutoff: Date = filter.processingStartedAt['$lte'];
+      const expectedMin = before - 10 * 60 * 1000;
+      const expectedMax = after - 10 * 60 * 1000;
+
+      expect(cutoff.getTime()).toBeGreaterThanOrEqual(expectedMin);
+      expect(cutoff.getTime()).toBeLessThanOrEqual(expectedMax + 1000);
+    });
+
+    it('reentrancy guard skips overlapping recovery cycles', async () => {
+      let resolveFirst!: () => void;
+      databaseScanService.getEligibleDatabases.mockReturnValueOnce(
+        new Promise<string[]>((res) => {
+          resolveFirst = () => res([]);
+        }),
+      );
+
+      const warnSpy = jest
+        .spyOn((service as any).logger, 'warn')
+        .mockImplementation(() => {});
+
+      const firstCycle = service.runRecoveryCycle();
+      await service.runRecoveryCycle();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Recovery cycle skipped'),
+      );
+
+      resolveFirst!();
+      await firstCycle;
+    });
+
+    it('recovery handles errors in individual databases without crashing', async () => {
+      const goodDb = makeDbWithRecovery(null, null, [], [], [], {
+        modifiedCount: 0,
+      });
+      databaseScanService.getEligibleDatabases.mockResolvedValue([
+        'bad-db',
+        'good-db',
+      ]);
+      mongoService.db.mockImplementation((name: string) => {
+        if (name === 'bad-db') throw new Error('connection refused');
+        return goodDb as unknown as Db;
+      });
+
+      await expect(service.runRecoveryCycle()).resolves.not.toThrow();
+    });
+  });
+
+  describe('custom MESSAGE_TIMEOUT_MINUTES', () => {
+    const buildServiceWithTimeout = async (
+      minutes: string,
+    ): Promise<{
+      service: RunDispatchService;
+      mongoSvc: jest.Mocked<MongoService>;
+      scanSvc: jest.Mocked<DatabaseScanService>;
+    }> => {
+      const original = process.env['MESSAGE_TIMEOUT_MINUTES'];
+      process.env['MESSAGE_TIMEOUT_MINUTES'] = minutes;
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          RunDispatchService,
+          {
+            provide: WebhookDispatchService,
+            useValue: {
+              dispatch: jest.fn().mockResolvedValue(true),
+              dispatchFup: jest.fn().mockResolvedValue(true),
+              dispatchMessage: jest.fn().mockResolvedValue(true),
+            },
+          },
+          { provide: MongoService, useValue: { db: jest.fn() } },
+          {
+            provide: DatabaseScanService,
+            useValue: {
+              getEligibleDatabases: jest.fn().mockResolvedValue(['test-db']),
+            },
+          },
+        ],
+      }).compile();
+
+      if (original === undefined) {
+        delete process.env['MESSAGE_TIMEOUT_MINUTES'];
+      } else {
+        process.env['MESSAGE_TIMEOUT_MINUTES'] = original;
+      }
+
+      return {
+        service: module.get<RunDispatchService>(RunDispatchService),
+        mongoSvc: module.get(MongoService),
+        scanSvc: module.get(DatabaseScanService),
+      };
+    };
+
+    it('(TOUT-02) uses custom MESSAGE_TIMEOUT_MINUTES when set', async () => {
+      const { service: svc, mongoSvc } = await buildServiceWithTimeout('5');
+
+      const mockUpdateMany = jest.fn().mockResolvedValue({ modifiedCount: 0 });
+      const mockDb = {
+        collection: jest.fn().mockReturnValue({
+          updateMany: mockUpdateMany,
+        }),
+      } as unknown as Db;
+      mongoSvc.db.mockReturnValue(mockDb);
+
+      const before = Date.now();
+      await svc.runRecoveryCycle();
+      const after = Date.now();
+
+      const filter = mockUpdateMany.mock.calls[0][0];
+      const cutoff: Date = filter.processingStartedAt['$lte'];
+      const expectedMin = before - 5 * 60 * 1000;
+      const expectedMax = after - 5 * 60 * 1000;
+
+      expect(cutoff.getTime()).toBeGreaterThanOrEqual(expectedMin);
+      expect(cutoff.getTime()).toBeLessThanOrEqual(expectedMax + 1000);
     });
   });
 });

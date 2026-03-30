@@ -16,6 +16,7 @@ describe('validateEnv', () => {
       CRON_INTERVAL_RUNS: '30000',
       CRON_INTERVAL_FUP: '15000',
       CRON_INTERVAL_MESSAGES: '5000',
+      CRON_INTERVAL_RECOVERY: '60000',
       TZ: 'America/Sao_Paulo',
     };
   });

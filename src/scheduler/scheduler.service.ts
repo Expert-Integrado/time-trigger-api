@@ -51,11 +51,23 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     );
     this.schedulerRegistry.addInterval('dispatch-messages', messagesId);
     this.logger.log(`Messages dispatch interval registered: ${messagesMs}ms`);
+
+    // TOUT-03: recovery interval — independent of dispatch-messages
+    const recoveryMs = Number(
+      this.configService.getOrThrow<string>('CRON_INTERVAL_RECOVERY'),
+    );
+    const recoveryId = setInterval(
+      () => void this.runDispatchService.runRecoveryCycle(),
+      recoveryMs,
+    );
+    this.schedulerRegistry.addInterval('recover-messages', recoveryId);
+    this.logger.log(`Recovery interval registered: ${recoveryMs}ms`);
   }
 
   onModuleDestroy(): void {
     this.schedulerRegistry.deleteInterval('dispatch-runs');
     this.schedulerRegistry.deleteInterval('dispatch-fup');
     this.schedulerRegistry.deleteInterval('dispatch-messages');
+    this.schedulerRegistry.deleteInterval('recover-messages');
   }
 }
