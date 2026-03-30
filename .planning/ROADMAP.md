@@ -130,5 +130,5 @@ Phases 1-8 complete. Phases 9-11 planned for v1.5.
 | 7. Messages Dispatch | v1.3 | 1/1 | Complete | 2026-03-26 |
 | 8. Independent Cron Intervals | v1.4 | 3/3 | Complete | 2026-03-26 |
 | 9. Rate Limiting | v1.5 | 2/2 | Complete    | 2026-03-30 |
-| 10. Message-Run Dependency | v1.5 | 2/2 | Complete   | 2026-03-30 |
+| 10. Message-Run Dependency | v1.5 | 2/2 | Complete    | 2026-03-30 |
 | 11. Timeout Recovery | v1.5 | 0/1 | Not started | - |
