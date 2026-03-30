@@ -10,9 +10,9 @@ Runs with `runStatus: "waiting"` must be detected and dispatched to their webhoo
 
 ## Current State
 
-**Shipped:** v1.5 Phase 10 — Message-Run Dependency (2026-03-30)
+**Shipped:** v1.5 Phase 11 — Timeout Recovery (2026-03-30)
 
-Run dispatch is now blocked when a matching message (same `botIdentifier` + `chatDataId`) is actively `"processing"`. Blocked runs stay `"waiting"` and are retried next cycle automatically. Messages gain `processingStartedAt: new Date()` timestamp on claim — prerequisite for Phase 11 timeout recovery. 138 tests, 0 failures.
+Messages stuck in `"processing"` (webhook never called back) are now automatically reset to `"pending"` by an independent `recover-messages` interval using MongoDB `updateMany` with `$lte` filter on `processingStartedAt`. Configurable via `MESSAGE_TIMEOUT_MINUTES` (default 10 min) and `CRON_INTERVAL_RECOVERY` (required env var). 145 tests, 0 failures.
 
 **Tech Stack:**
 - NestJS 11
@@ -26,7 +26,7 @@ Run dispatch is now blocked when a matching message (same `botIdentifier` + `cha
 - Per-client time controls via `timeTrigger` (enabled, morningLimit, nightLimit, allowedDays)
 - Atomic dispatch prevention (no duplicates)
 - Parallel database processing
-- Three independent dispatch types: runs, FUP, messages
+- Four independent intervals: runs, FUP, messages, timeout recovery
 - Single retry on failure with 1-min delay
 - Docker containerization with TZ=America/Sao_Paulo
 - Health endpoint for monitoring
