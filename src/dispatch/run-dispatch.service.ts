@@ -27,6 +27,7 @@ export class RunDispatchService {
   private isRunningRuns = false;
   private isRunningFup = false;
   private isRunningMessages = false;
+  private isRunningRecovery = false;
 
   private readonly rateLimitRuns = parseInt(
     process.env['RATE_LIMIT_RUNS'] ?? '10',
@@ -38,6 +39,10 @@ export class RunDispatchService {
   );
   private readonly rateLimitMessages = parseInt(
     process.env['RATE_LIMIT_MESSAGES'] ?? '10',
+    10,
+  );
+  private readonly timeoutMinutes = parseInt(
+    process.env['MESSAGE_TIMEOUT_MINUTES'] ?? '10',
     10,
   );
 
@@ -146,6 +151,59 @@ export class RunDispatchService {
       this.logger.error(`Messages cycle failed: ${String(err)}`);
     } finally {
       this.isRunningMessages = false;
+    }
+  }
+
+  async runRecoveryCycle(): Promise<void> {
+    if (this.isRunningRecovery) {
+      this.logger.warn(
+        'Recovery cycle skipped — previous cycle still running',
+      );
+      return;
+    }
+    this.isRunningRecovery = true;
+
+    try {
+      this.logger.log('Recovery cycle started');
+      const databases = await this.databaseScanService.getEligibleDatabases();
+
+      const results = await Promise.allSettled(
+        databases.map((dbName) => this.recoverTimedOutMessages(dbName)),
+      );
+
+      results.forEach((r, i) => {
+        if (r.status === 'rejected') {
+          this.logger.error(
+            `[${databases[i]}] Unhandled error during recovery: ${String(r.reason)}`,
+          );
+        }
+      });
+
+      const errorCount = results.filter((r) => r.status === 'rejected').length;
+      this.logger.log(
+        `Recovery cycle complete — ${databases.length} DBs, ${errorCount} errors`,
+      );
+    } catch (err) {
+      this.logger.error(`Recovery cycle failed: ${String(err)}`);
+    } finally {
+      this.isRunningRecovery = false;
+    }
+  }
+
+  private async recoverTimedOutMessages(dbName: string): Promise<void> {
+    const db: Db = this.mongoService.db(dbName);
+    const cutoff = new Date(Date.now() - this.timeoutMinutes * 60 * 1000);
+    const result = await db.collection('messages').updateMany(
+      {
+        messageStatus: 'processing',
+        processingStartedAt: { $lte: cutoff },
+      },
+      { $set: { messageStatus: 'pending' } },
+    );
+    if (result.modifiedCount > 0) {
+      this.logger.warn(
+        `[${dbName}] Recovery: ${result.modifiedCount} message(s) reset to pending (timeout: ${this.timeoutMinutes}min)`,
+      );
     }
   }
 

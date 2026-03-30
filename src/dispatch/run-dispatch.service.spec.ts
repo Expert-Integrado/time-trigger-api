@@ -30,7 +30,11 @@ describe('RunDispatchService', () => {
       webhooks: { findOne: jest.fn().mockResolvedValue(webhooks) },
       runs: { find: jest.fn().mockReturnValue(mockRunsFind) },
       fup: { find: jest.fn().mockReturnValue(mockFupsFind) },
-      messages: { find: jest.fn().mockReturnValue(mockMessagesFind) },
+      messages: {
+        find: jest.fn().mockReturnValue(mockMessagesFind),
+        findOne: jest.fn().mockResolvedValue(null),
+        updateMany: jest.fn().mockResolvedValue({ modifiedCount: 0 }),
+      },
     };
     return {
       collection: jest.fn((name: string) => collections[name]),
@@ -1217,6 +1221,201 @@ describe('RunDispatchService', () => {
         expect.stringContaining('Rate limit reached for runs (1/1) — skipping remaining items'),
       );
       jest.restoreAllMocks();
+    });
+  });
+
+  // ---- runRecoveryCycle — timeout recovery tests ----
+
+  describe('runRecoveryCycle — timeout recovery', () => {
+    // Rebuild makeDb with updateMany on messages
+    const makeDbWithRecovery = (
+      vars: Record<string, unknown> | null,
+      webhooks: Record<string, unknown> | null,
+      runs: Record<string, unknown>[] = [],
+      fups: Record<string, unknown>[] = [],
+      messages: Record<string, unknown>[] = [],
+      updateManyResult: { modifiedCount: number } = { modifiedCount: 0 },
+    ) => {
+      const mockRunsFind = { toArray: jest.fn().mockResolvedValue(runs) };
+      const mockFupsFind = { toArray: jest.fn().mockResolvedValue(fups) };
+      const mockMessagesFind = {
+        toArray: jest.fn().mockResolvedValue(messages),
+      };
+      const collections: Record<string, Record<string, jest.Mock>> = {
+        vars: { findOne: jest.fn().mockResolvedValue(vars) },
+        webhooks: { findOne: jest.fn().mockResolvedValue(webhooks) },
+        runs: { find: jest.fn().mockReturnValue(mockRunsFind) },
+        fup: { find: jest.fn().mockReturnValue(mockFupsFind) },
+        messages: {
+          find: jest.fn().mockReturnValue(mockMessagesFind),
+          findOne: jest.fn().mockResolvedValue(null),
+          updateMany: jest.fn().mockResolvedValue(updateManyResult),
+        },
+      };
+      return {
+        collection: jest.fn((name: string) => collections[name]),
+        _collections: collections,
+      } as unknown as Db & { _collections: typeof collections };
+    };
+
+    it('(TOUT-01) resets processing messages older than timeout to pending', async () => {
+      const db = makeDbWithRecovery(null, null, [], [], [], {
+        modifiedCount: 0,
+      });
+      mongoService.db.mockReturnValue(db as unknown as Db);
+
+      await service.runRecoveryCycle();
+
+      const updateMany = (db as any)._collections.messages.updateMany;
+      expect(updateMany).toHaveBeenCalledWith(
+        {
+          messageStatus: 'processing',
+          processingStartedAt: { $lte: expect.any(Date) },
+        },
+        { $set: { messageStatus: 'pending' } },
+      );
+    });
+
+    it('(TOUT-04) filter uses only $lte — no $exists guard', async () => {
+      const db = makeDbWithRecovery(null, null, [], [], [], {
+        modifiedCount: 0,
+      });
+      mongoService.db.mockReturnValue(db as unknown as Db);
+
+      await service.runRecoveryCycle();
+
+      const updateMany = (db as any)._collections.messages.updateMany;
+      const filter = updateMany.mock.calls[0][0];
+      expect(filter.processingStartedAt['$exists']).toBeUndefined();
+    });
+
+    it('(TOUT-02) default timeout is 10 minutes', async () => {
+      const db = makeDbWithRecovery(null, null, [], [], [], {
+        modifiedCount: 0,
+      });
+      mongoService.db.mockReturnValue(db as unknown as Db);
+
+      const before = Date.now();
+      await service.runRecoveryCycle();
+      const after = Date.now();
+
+      const updateMany = (db as any)._collections.messages.updateMany;
+      const filter = updateMany.mock.calls[0][0];
+      const cutoff: Date = filter.processingStartedAt['$lte'];
+      const expectedMin = before - 10 * 60 * 1000;
+      const expectedMax = after - 10 * 60 * 1000;
+
+      expect(cutoff.getTime()).toBeGreaterThanOrEqual(expectedMin);
+      expect(cutoff.getTime()).toBeLessThanOrEqual(expectedMax + 1000);
+    });
+
+    it('reentrancy guard skips overlapping recovery cycles', async () => {
+      let resolveFirst!: () => void;
+      databaseScanService.getEligibleDatabases.mockReturnValueOnce(
+        new Promise<string[]>((res) => {
+          resolveFirst = () => res([]);
+        }),
+      );
+
+      const warnSpy = jest
+        .spyOn((service as any).logger, 'warn')
+        .mockImplementation(() => {});
+
+      const firstCycle = service.runRecoveryCycle();
+      await service.runRecoveryCycle();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Recovery cycle skipped'),
+      );
+
+      resolveFirst!();
+      await firstCycle;
+    });
+
+    it('recovery handles errors in individual databases without crashing', async () => {
+      const goodDb = makeDbWithRecovery(null, null, [], [], [], {
+        modifiedCount: 0,
+      });
+      databaseScanService.getEligibleDatabases.mockResolvedValue([
+        'bad-db',
+        'good-db',
+      ]);
+      mongoService.db.mockImplementation((name: string) => {
+        if (name === 'bad-db') throw new Error('connection refused');
+        return goodDb as unknown as Db;
+      });
+
+      await expect(service.runRecoveryCycle()).resolves.not.toThrow();
+    });
+  });
+
+  describe('custom MESSAGE_TIMEOUT_MINUTES', () => {
+    const buildServiceWithTimeout = async (
+      minutes: string,
+    ): Promise<{
+      service: RunDispatchService;
+      mongoSvc: jest.Mocked<MongoService>;
+      scanSvc: jest.Mocked<DatabaseScanService>;
+    }> => {
+      const original = process.env['MESSAGE_TIMEOUT_MINUTES'];
+      process.env['MESSAGE_TIMEOUT_MINUTES'] = minutes;
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          RunDispatchService,
+          {
+            provide: WebhookDispatchService,
+            useValue: {
+              dispatch: jest.fn().mockResolvedValue(true),
+              dispatchFup: jest.fn().mockResolvedValue(true),
+              dispatchMessage: jest.fn().mockResolvedValue(true),
+            },
+          },
+          { provide: MongoService, useValue: { db: jest.fn() } },
+          {
+            provide: DatabaseScanService,
+            useValue: {
+              getEligibleDatabases: jest.fn().mockResolvedValue(['test-db']),
+            },
+          },
+        ],
+      }).compile();
+
+      if (original === undefined) {
+        delete process.env['MESSAGE_TIMEOUT_MINUTES'];
+      } else {
+        process.env['MESSAGE_TIMEOUT_MINUTES'] = original;
+      }
+
+      return {
+        service: module.get<RunDispatchService>(RunDispatchService),
+        mongoSvc: module.get(MongoService),
+        scanSvc: module.get(DatabaseScanService),
+      };
+    };
+
+    it('(TOUT-02) uses custom MESSAGE_TIMEOUT_MINUTES when set', async () => {
+      const { service: svc, mongoSvc } = await buildServiceWithTimeout('5');
+
+      const mockUpdateMany = jest.fn().mockResolvedValue({ modifiedCount: 0 });
+      const mockDb = {
+        collection: jest.fn().mockReturnValue({
+          updateMany: mockUpdateMany,
+        }),
+      } as unknown as Db;
+      mongoSvc.db.mockReturnValue(mockDb);
+
+      const before = Date.now();
+      await svc.runRecoveryCycle();
+      const after = Date.now();
+
+      const filter = mockUpdateMany.mock.calls[0][0];
+      const cutoff: Date = filter.processingStartedAt['$lte'];
+      const expectedMin = before - 5 * 60 * 1000;
+      const expectedMax = after - 5 * 60 * 1000;
+
+      expect(cutoff.getTime()).toBeGreaterThanOrEqual(expectedMin);
+      expect(cutoff.getTime()).toBeLessThanOrEqual(expectedMax + 1000);
     });
   });
 });
