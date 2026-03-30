@@ -11,6 +11,7 @@ describe('RunDispatchService', () => {
   let webhookDispatchService: jest.Mocked<WebhookDispatchService>;
   let mongoService: jest.Mocked<MongoService>;
   let databaseScanService: jest.Mocked<DatabaseScanService>;
+  let messageCheckService: jest.Mocked<MessageCheckService>;
 
   // Helpers for building mock Db handles
   const makeDb = (
@@ -31,7 +32,10 @@ describe('RunDispatchService', () => {
       webhooks: { findOne: jest.fn().mockResolvedValue(webhooks) },
       runs: { find: jest.fn().mockReturnValue(mockRunsFind) },
       fup: { find: jest.fn().mockReturnValue(mockFupsFind) },
-      messages: { find: jest.fn().mockReturnValue(mockMessagesFind) },
+      messages: {
+        find: jest.fn().mockReturnValue(mockMessagesFind),
+        findOne: jest.fn().mockResolvedValue(null),
+      },
     };
     return {
       collection: jest.fn((name: string) => collections[name]),
@@ -82,6 +86,7 @@ describe('RunDispatchService', () => {
     webhookDispatchService = module.get(WebhookDispatchService);
     mongoService = module.get(MongoService);
     databaseScanService = module.get(DatabaseScanService);
+    messageCheckService = module.get(MessageCheckService);
   });
 
   const withinWindowVars = {
@@ -1251,6 +1256,71 @@ describe('RunDispatchService', () => {
           'Rate limit reached for runs (1/1) — skipping remaining items',
         ),
       );
+      jest.restoreAllMocks();
+    });
+  });
+
+  describe('Message-Run Dependency (DEP-02, DEP-03, DEP-04, DEP-05)', () => {
+    it('(DEP-02/DEP-03) skips run when processing message exists for same botIdentifier+chatDataId', async () => {
+      const run = {
+        _id: 'run-001',
+        runStatus: 'waiting',
+        waitUntil: 1,
+        botIdentifier: 'bot-x',
+        chatDataId: 'chat-y',
+      };
+      const db = makeDb(withinWindowVars, webhooksDoc, [run]);
+      mongoService.db.mockReturnValue(db as unknown as Db);
+      messageCheckService.hasProcessingMessage.mockResolvedValue(true);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+      await service.runRunsCycle();
+
+      expect(webhookDispatchService.dispatch).not.toHaveBeenCalled();
+      jest.restoreAllMocks();
+    });
+
+    it('(DEP-03) dispatches run normally when no processing message exists', async () => {
+      const run = {
+        _id: 'run-002',
+        runStatus: 'waiting',
+        waitUntil: 1,
+        botIdentifier: 'bot-x',
+        chatDataId: 'chat-y',
+      };
+      const db = makeDb(withinWindowVars, webhooksDoc, [run]);
+      mongoService.db.mockReturnValue(db as unknown as Db);
+      messageCheckService.hasProcessingMessage.mockResolvedValue(false);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+      await service.runRunsCycle();
+
+      expect(webhookDispatchService.dispatch).toHaveBeenCalledWith(
+        expect.anything(),
+        run,
+        expect.any(String),
+      );
+      jest.restoreAllMocks();
+    });
+
+    it('(DEP-04) dispatches run without dependency check when botIdentifier or chatDataId is absent', async () => {
+      const run = {
+        _id: 'run-003',
+        runStatus: 'waiting',
+        waitUntil: 1,
+        // no botIdentifier, no chatDataId
+      };
+      const db = makeDb(withinWindowVars, webhooksDoc, [run]);
+      mongoService.db.mockReturnValue(db as unknown as Db);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+      await service.runRunsCycle();
+
+      expect(messageCheckService.hasProcessingMessage).not.toHaveBeenCalled();
+      expect(webhookDispatchService.dispatch).toHaveBeenCalled();
       jest.restoreAllMocks();
     });
   });
