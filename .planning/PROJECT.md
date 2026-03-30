@@ -10,9 +10,9 @@ Runs with `runStatus: "waiting"` must be detected and dispatched to their webhoo
 
 ## Current State
 
-**Shipped:** v1.5 Phase 9 — Rate Limiting (2026-03-30)
+**Shipped:** v1.5 Phase 10 — Message-Run Dependency (2026-03-30)
 
-Per-database rate limiting is now implemented for all three dispatch types. Each `processDatabase*` cycle enforces configurable per-call limits (env vars `RATE_LIMIT_RUNS/FUP/MESSAGES`, default 10). Dispatch methods return `Promise<boolean>` — counters increment only on successful claims. 129 tests, 0 failures.
+Run dispatch is now blocked when a matching message (same `botIdentifier` + `chatDataId`) is actively `"processing"`. Blocked runs stay `"waiting"` and are retried next cycle automatically. Messages gain `processingStartedAt: new Date()` timestamp on claim — prerequisite for Phase 11 timeout recovery. 138 tests, 0 failures.
 
 **Tech Stack:**
 - NestJS 11
