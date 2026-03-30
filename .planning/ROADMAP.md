@@ -65,7 +65,7 @@
 
 - [x] **Phase 9: Rate Limiting** - Cap webhook dispatches per database per cycle across all three dispatch types (completed 2026-03-30)
 - [x] **Phase 10: Message-Run Dependency** - Block run dispatch when matching messages are actively processing, with timestamp tracking (completed 2026-03-30)
-- [ ] **Phase 11: Timeout Recovery** - Automatically reset stuck "processing" messages to "pending" via an independent recovery interval
+- [x] **Phase 11: Timeout Recovery** - Automatically reset stuck "processing" messages to "pending" via an independent recovery interval (completed 2026-03-30)
 
 ## Phase Details
 
@@ -131,4 +131,4 @@ Phases 1-8 complete. Phases 9-11 planned for v1.5.
 | 8. Independent Cron Intervals | v1.4 | 3/3 | Complete | 2026-03-26 |
 | 9. Rate Limiting | v1.5 | 2/2 | Complete    | 2026-03-30 |
 | 10. Message-Run Dependency | v1.5 | 2/2 | Complete    | 2026-03-30 |
-| 11. Timeout Recovery | v1.5 | 0/1 | Not started | - |
+| 11. Timeout Recovery | v1.5 | 0/1 | Complete    | 2026-03-30 |
