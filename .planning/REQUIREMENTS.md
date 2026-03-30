@@ -17,11 +17,11 @@
 
 ### Message-Run Dependency (DEP-*)
 
-- [ ] **DEP-01**: `processingStartedAt` timestamp field is set on message documents when `messageStatus` changes to `"processing"`
-- [ ] **DEP-02**: Before dispatching a run, check if any messages exist with `messageStatus: "processing"` matching same `botIdentifier` + `chatDataId`
-- [ ] **DEP-03**: If a blocking message exists: run is skipped, stays `"waiting"`, next cycle retries automatically
-- [ ] **DEP-04**: Dependency filter always uses both `botIdentifier` AND `chatDataId` — never one without the other
-- [ ] **DEP-05**: Only `"processing"` messages block runs — `"pending"` messages do not block runs
+- [x] **DEP-01**: `processingStartedAt` timestamp field is set on message documents when `messageStatus` changes to `"processing"`
+- [x] **DEP-02**: Before dispatching a run, check if any messages exist with `messageStatus: "processing"` matching same `botIdentifier` + `chatDataId`
+- [x] **DEP-03**: If a blocking message exists: run is skipped, stays `"waiting"`, next cycle retries automatically
+- [x] **DEP-04**: Dependency filter always uses both `botIdentifier` AND `chatDataId` — never one without the other
+- [x] **DEP-05**: Only `"processing"` messages block runs — `"pending"` messages do not block runs
 
 ### Timeout Recovery (TOUT-*)
 

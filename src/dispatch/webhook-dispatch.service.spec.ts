@@ -143,7 +143,11 @@ describe('WebhookDispatchService', () => {
     fetchMock.mockResolvedValueOnce({ ok: true });
     // mockCollection.findOneAndUpdate already returns run (truthy) by default
 
-    const result = await service.dispatch(mockDb as unknown as Db, run, webhookUrl);
+    const result = await service.dispatch(
+      mockDb as unknown as Db,
+      run,
+      webhookUrl,
+    );
 
     expect(result).toBe(true);
   });
@@ -152,7 +156,11 @@ describe('WebhookDispatchService', () => {
     fetchMock.mockResolvedValueOnce({ ok: true });
     mockCollection.findOneAndUpdate.mockResolvedValueOnce(null);
 
-    const result = await service.dispatch(mockDb as unknown as Db, run, webhookUrl);
+    const result = await service.dispatch(
+      mockDb as unknown as Db,
+      run,
+      webhookUrl,
+    );
 
     expect(result).toBe(false);
   });
@@ -160,7 +168,11 @@ describe('WebhookDispatchService', () => {
   it('returns false when HTTP post fails (retry path)', async () => {
     fetchMock.mockResolvedValueOnce({ ok: false });
 
-    const result = await service.dispatch(mockDb as unknown as Db, run, webhookUrl);
+    const result = await service.dispatch(
+      mockDb as unknown as Db,
+      run,
+      webhookUrl,
+    );
 
     expect(result).toBe(false);
     expect(setTimeout).toHaveBeenCalledWith(expect.any(Function), 60_000);
@@ -304,7 +316,11 @@ describe('WebhookDispatchService - dispatchFup', () => {
     fetchMock.mockResolvedValueOnce({ ok: true });
     // mockFupCollection.findOneAndUpdate already returns fup (truthy) by default
 
-    const result = await service.dispatchFup(mockFupDb as unknown as Db, fup, fupWebhookUrl);
+    const result = await service.dispatchFup(
+      mockFupDb as unknown as Db,
+      fup,
+      fupWebhookUrl,
+    );
 
     expect(result).toBe(true);
   });
@@ -313,7 +329,11 @@ describe('WebhookDispatchService - dispatchFup', () => {
     fetchMock.mockResolvedValueOnce({ ok: true });
     mockFupCollection.findOneAndUpdate.mockResolvedValueOnce(null);
 
-    const result = await service.dispatchFup(mockFupDb as unknown as Db, fup, fupWebhookUrl);
+    const result = await service.dispatchFup(
+      mockFupDb as unknown as Db,
+      fup,
+      fupWebhookUrl,
+    );
 
     expect(result).toBe(false);
   });

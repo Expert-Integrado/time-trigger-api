@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Rate Limiting and Message-Run Dependency
-status: verifying
-stopped_at: Completed 09-02-PLAN.md
-last_updated: "2026-03-30T12:48:43.747Z"
+status: executing
+stopped_at: Completed 10-01-PLAN.md
+last_updated: "2026-03-30T13:22:59.812Z"
 last_activity: 2026-03-30
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 2
-  completed_plans: 2
+  completed_plans: 3
 ---
 
 # Project State
@@ -20,13 +20,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Runs, FUPs, and messages must be detected and dispatched to their webhooks reliably — no missed dispatches, no duplicates.
-**Current focus:** Phase 09 — rate-limiting
+**Current focus:** Phase 10 — message-run-dependency
 
 ## Current Position
 
-Phase: 10
-Plan: Not started
-Status: Phase complete — ready for verification
+Phase: 10 (message-run-dependency) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-03-30
 
 ## Performance Metrics
@@ -55,6 +55,7 @@ Last activity: 2026-03-30
 | Phase 08-independent-cron-intervals P02 | 4min | 2 tasks | 2 files |
 | Phase 09-rate-limiting P01 | 2min | 2 tasks | 2 files |
 | Phase 09-rate-limiting P02 | 5min | 2 tasks | 2 files |
+| Phase 10-message-run-dependency P01 | 4min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -78,6 +79,9 @@ Recent decisions affecting current work:
 - [Phase 09-rate-limiting]: RATE_LIMIT_* env vars are optional with default 10 — not added to REQUIRED_ENV_VARS
 - [Phase 09-rate-limiting]: Boolean dispatch return: true = atomic claim succeeded, false = already claimed or retry path
 - [Phase 09-rate-limiting]: Used fresh TestingModule per rate-limit test via buildServiceWithLimit helper — env vars set before compile, restored after
+- [Phase 10-message-run-dependency]: MessageCheckService uses findOne (not countDocuments) — stops at first match, more efficient
+- [Phase 10-message-run-dependency]: Dependency guard positioned after rate limit check (in-memory, free) and before dispatch (DB cost) — avoids unnecessary MongoDB queries
+- [Phase 10-message-run-dependency]: Missing botIdentifier or chatDataId on run document silently bypasses dependency guard — safe default for legacy documents
 
 ### Pending Todos
 
@@ -89,6 +93,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-30T12:38:30.745Z
-Stopped at: Completed 09-02-PLAN.md
+Last session: 2026-03-30T13:22:59.806Z
+Stopped at: Completed 10-01-PLAN.md
 Resume file: None
