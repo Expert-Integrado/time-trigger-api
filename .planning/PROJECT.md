@@ -10,9 +10,9 @@ Runs with `runStatus: "waiting"` must be detected and dispatched to their webhoo
 
 ## Current State
 
-**Shipped:** v1.4 Independent Cron Intervals (2026-03-29)
+**Shipped:** v1.5 Phase 9 — Rate Limiting (2026-03-30)
 
-The service now runs 3 independent cron intervals — one for runs dispatch, one for FUP dispatch, one for messages dispatch — each with its own `setInterval`, env var, and `isRunning` guard. This eliminates cross-blocking between dispatch types.
+Per-database rate limiting is now implemented for all three dispatch types. Each `processDatabase*` cycle enforces configurable per-call limits (env vars `RATE_LIMIT_RUNS/FUP/MESSAGES`, default 10). Dispatch methods return `Promise<boolean>` — counters increment only on successful claims. 129 tests, 0 failures.
 
 **Tech Stack:**
 - NestJS 11
@@ -67,10 +67,12 @@ The service now runs 3 independent cron intervals — one for runs dispatch, one
 - ✓ Independent cron intervals for runs, FUP, messages — v1.4
 - ✓ Each dispatch type has own isRunning guard (no cross-blocking) — v1.4
 - ✓ CRON_INTERVAL_RUNS, CRON_INTERVAL_FUP, CRON_INTERVAL_MESSAGES env vars — v1.4
+- ✓ Per-database rate limiting for all dispatch types (RATE_LIMIT_RUNS/FUP/MESSAGES env vars) — v1.5 Phase 9
+- ✓ Dispatch methods return Promise<boolean> enabling accurate per-cycle counters — v1.5 Phase 9
 
 ### Active
 
-- [ ] Per-database rate limiting for webhook dispatch (configurable limit per dispatch type)
+- [ ] Message-run dependency based on botIdentifier + chatDataId
 - [ ] Message-run dependency based on botIdentifier + chatDataId
 - [ ] Automatic timeout recovery for stuck messages (>10 min in "processing")
 
@@ -141,4 +143,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-29 after v1.5 milestone started*
+*Last updated: 2026-03-30 after Phase 09 (rate-limiting) complete*
