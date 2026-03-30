@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RunDispatchService } from './run-dispatch.service.js';
 import { WebhookDispatchService } from './webhook-dispatch.service.js';
+import { MessageCheckService } from './message-check.service.js';
 import { MongoService } from '../mongo/mongo.service.js';
 import { DatabaseScanService } from '../database/database-scan.service.js';
 import { Db } from 'mongodb';
@@ -10,6 +11,7 @@ describe('RunDispatchService', () => {
   let webhookDispatchService: jest.Mocked<WebhookDispatchService>;
   let mongoService: jest.Mocked<MongoService>;
   let databaseScanService: jest.Mocked<DatabaseScanService>;
+  let messageCheckService: jest.Mocked<MessageCheckService>;
 
   // Helpers for building mock Db handles
   const makeDb = (
@@ -72,6 +74,12 @@ describe('RunDispatchService', () => {
             getEligibleDatabases: jest.fn().mockResolvedValue(['test-db']),
           },
         },
+        {
+          provide: MessageCheckService,
+          useValue: {
+            hasProcessingMessage: jest.fn().mockResolvedValue(false),
+          },
+        },
       ],
     }).compile();
 
@@ -79,6 +87,7 @@ describe('RunDispatchService', () => {
     webhookDispatchService = module.get(WebhookDispatchService);
     mongoService = module.get(MongoService);
     databaseScanService = module.get(DatabaseScanService);
+    messageCheckService = module.get(MessageCheckService);
   });
 
   const withinWindowVars = {
@@ -935,6 +944,10 @@ describe('RunDispatchService', () => {
               getEligibleDatabases: jest.fn().mockResolvedValue(['test-db']),
             },
           },
+          {
+            provide: MessageCheckService,
+            useValue: { hasProcessingMessage: jest.fn().mockResolvedValue(false) },
+          },
         ],
       }).compile();
 
@@ -1377,6 +1390,10 @@ describe('RunDispatchService', () => {
             useValue: {
               getEligibleDatabases: jest.fn().mockResolvedValue(['test-db']),
             },
+          },
+          {
+            provide: MessageCheckService,
+            useValue: { hasProcessingMessage: jest.fn().mockResolvedValue(false) },
           },
         ],
       }).compile();
