@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Rate Limiting and Message-Run Dependency
-status: Defining requirements
-stopped_at: Milestone v1.5 started
-last_updated: "2026-03-29T21:30:00.000Z"
+status: planned
+stopped_at: Roadmap created for v1.5 (Phases 9-11)
+last_updated: "2026-03-30T00:00:00.000Z"
 progress:
-  total_phases: null
+  total_phases: 3
   completed_phases: 0
-  total_plans: null
+  total_plans: 5
   completed_plans: 0
 ---
 
@@ -23,10 +23,10 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 9 (Rate Limiting)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-03-29 — Milestone v1.5 started
+Status: planned
+Last activity: 2026-03-30 — Roadmap created, Phase 9 ready to plan
 
 ## Performance Metrics
 
@@ -68,6 +68,9 @@ Recent decisions affecting current work:
 - [Phase 08]: Scheduler temporarily wired to runRunsCycle only; Plan 02 will add independent intervals for FUP and messages
 - [Phase 08-independent-cron-intervals]: CRON_INTERVAL completely removed from validateEnv() — 3 new vars (RUNS/FUP/MESSAGES) required at startup; absence triggers process.exit(1)
 - [Phase 08-independent-cron-intervals]: CRON_INTERVAL replaced by CRON_INTERVAL_RUNS/CRON_INTERVAL_FUP/CRON_INTERVAL_MESSAGES — each interval independent
+- [v1.5 roadmap]: Rate limiting uses in-memory Map<dbName, counter> — no Redis, no external state; counters reset at cycle start
+- [v1.5 roadmap]: Phases 10 and 11 must deploy together — dependency check without timeout recovery creates permanent run-blocking
+- [v1.5 roadmap]: processingStartedAt timestamp added in Phase 10 as prerequisite for Phase 11 recovery queries
 
 ### Pending Todos
 
@@ -75,10 +78,10 @@ None.
 
 ### Blockers/Concerns
 
-None.
+- [Phase 10]: Confirm that run documents contain `chatDataId` field in production data before implementing the dependency filter. Research assumes yes but this should be verified.
 
 ## Session Continuity
 
-Last session: 2026-03-26T18:34:54.278Z
-Stopped at: Completed 08-02-PLAN.md
+Last session: 2026-03-30T00:00:00.000Z
+Stopped at: Roadmap created — ready for /gsd:plan-phase 9
 Resume file: None
