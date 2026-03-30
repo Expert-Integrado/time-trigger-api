@@ -1,197 +1,186 @@
 # Project Research Summary
 
-**Project:** Time Trigger API
-**Domain:** Cron-based multi-database webhook dispatch service (headless background service)
-**Researched:** 2026-03-25
+**Project:** Time Trigger API — v1.5 Rate Limiting and Message-Run Dependency
+**Domain:** Multi-tenant cron-based webhook dispatcher (NestJS + MongoDB)
+**Researched:** 2026-03-29
 **Confidence:** HIGH
 
 ## Executive Summary
 
-The Time Trigger API is a headless cron service that polls multiple client MongoDB databases, identifies scheduled run documents whose time has come, and dispatches them via HTTP POST to per-client webhook endpoints. This is a well-understood pattern — the entire system reduces to a polling loop, a fan-out query over N databases, and idempotent HTTP dispatch. The recommended approach builds on the existing NestJS 11 + MongoDB native driver scaffold rather than introducing new infrastructure: `@nestjs/schedule` drives the cron loop, one shared `MongoClient` serves all databases via `client.db(dbName)`, and `axios` handles HTTP dispatch. No Redis, no queues, no external state — MongoDB's own `runs` collection is the durable job store.
+This milestone adds three complementary features to the existing v1.4 dispatch system: per-database rate limiting, message-run dependency enforcement, and automatic timeout recovery for stuck messages. All three features are purely application logic — no new dependencies are required. The existing NestJS 11 + MongoDB 7.1.1 stack provides every primitive needed: `countDocuments`, `updateMany`, in-memory `Map`, and `ConfigService`.
 
-The key architectural insight is that MongoDB's `findOneAndUpdate` with a `{ runStatus: "waiting" }` filter is both the eligibility check and the atomic claim in one operation. This single pattern prevents duplicate dispatch without any distributed locking infrastructure. Combined with a boolean `isRunning` guard on the cron handler (to prevent overlapping cycles), the service achieves reliable at-most-once dispatch. The `vars` and `webhooks` collections must be re-read fresh every cycle — no caching — because external systems mutate them at runtime.
+The recommended implementation order mirrors the feature dependency graph. Timeout recovery must ship before dependency enforcement, because the dependency check blocks runs on "processing" messages — and without recovery, a stuck message permanently blocks a run. Rate limiting is independent and can ship in any order, but starting with it establishes the dispatch loop structure that the other features extend. All three features integrate additively into `RunDispatchService` and `WebhookDispatchService` with no structural changes to existing services.
 
-The primary risks are operational rather than architectural: overlapping cron cycles causing duplicate dispatches if the atomic claim pattern is not used from day one; runs permanently stuck in an intermediate `processing` state after a crash unless a recovery path exists; timezone misconfiguration causing time-window checks to pass or fail at the wrong hours; and webhook HTTP calls without explicit timeouts causing one slow endpoint to stall an entire cycle. All of these are prevention-first problems — they are trivially avoidable if addressed during initial implementation and nearly impossible to debug after the fact in a headless service.
+The critical risk in this milestone is correctness, not complexity. Three specific mistakes can silently corrupt dispatch behavior: (1) a global rate limiter that starves low-volume tenants, (2) a dependency check missing the `botIdentifier` filter causing cross-bot blocking, and (3) timeout recovery that never fires because the `processingStartedAt` timestamp field was not added to the `dispatchMessage` update. All three are easy to get wrong and hard to detect without deliberate testing.
 
 ## Key Findings
 
-### Recommended Stack
+### Stack Additions
 
-The project already has the right foundation installed: NestJS 11.1.17, MongoDB native driver 7.1.1, TypeScript 5.9.3, and Jest 30 are confirmed from the lockfile. Four packages must be added: `@nestjs/schedule` (v4.x for NestJS 11 compatibility), `@nestjs/config`, `@nestjs/axios`, and `axios`. Mongoose must never be used — it enforces a single-connection model that is architecturally incompatible with multi-database enumeration. The native driver's `client.db(dbName)` is the correct primitive.
+No new libraries required. All features use the existing validated stack.
 
-**Core technologies:**
-- **NestJS 11** (installed): Application framework — DI container, lifecycle hooks, module system; `@nestjs/schedule` integrates natively
-- **MongoDB native driver 7.1.1** (installed): Multi-database access — `client.db(name)` on a single shared client handles all N databases over one connection pool
-- **`@nestjs/schedule` v4.x** (to install): Cron scheduling — use `SchedulerRegistry.addCronJob()` at `onModuleInit` rather than `@Cron()` decorator, because `CRON_INTERVAL` is a runtime env var and `@Cron()` requires a decoration-time literal
-- **`@nestjs/config` v3.x** (to install): Environment variable management — `ConfigService` over raw `process.env` for testability and centralized validation
-- **`@nestjs/axios` / `axios`** (to install): HTTP webhook dispatch — explicit 10-15 second timeout required on every call; no default timeout in axios
-- **Node.js 22 LTS**: Runtime — already targeted in lockfile engine constraints; use `node:22-alpine` in Docker
+**New environment variables (all optional with defaults):**
+- `RATE_LIMIT_RUNS` (default: 10) — max runs dispatched per database per cycle
+- `RATE_LIMIT_FUP` (default: 10) — max FUPs dispatched per database per cycle
+- `RATE_LIMIT_MESSAGES` (default: 10) — max messages dispatched per database per cycle
+- `MESSAGE_TIMEOUT_MINUTES` (default: 10) — minutes before a "processing" message resets to "pending"
 
-### Expected Features
+**Schema change (additive, no migration):** Add `processingStartedAt: number` to messages when status changes to `"processing"`. Old messages without this field are unaffected by recovery queries.
 
-See `.planning/research/FEATURES.md` for full prioritization matrix.
+**What NOT to add:** `@nestjs/throttler`, Redis, BullMQ, `bottleneck`, or any distributed locking library. Rate limit is cycle-scoped and resets every interval — in-memory `Map` is sufficient and correct.
 
-**Must have (v1 — table stakes):**
-- Cron polling loop driven by `CRON_INTERVAL` env var — without this nothing triggers
-- MongoDB multi-DB discovery with collection-presence filtering (`runs` + `webhooks` + `vars`) — discovers eligible client databases
-- Run eligibility query: `runStatus: "waiting"` AND `waitUntil <= now()` — identifies what to dispatch
-- Time-of-day gate using `morningLimit` / `nightLimit` from `vars` — per-client scheduling window (UTC hours, pinned)
-- Webhook POST to "Processador de Runs" URL from `webhooks` collection — core dispatch action
-- Atomic status transition via `findOneAndUpdate`: `waiting` → `processing` → `queued` — prevents duplicate dispatch
-- Single retry after 1 minute on failure via non-blocking `setTimeout`; leave as `waiting` if retry also fails
-- Config re-read every cycle — no caching of `vars` or `webhooks`
-- Startup env validation for `MONGODB_URI` — fail fast rather than crashing mid-cycle
-- Structured logging per cycle — minimum observability for a headless service
-- Docker container with env-based config — delivery target
+### Feature Table Stakes
 
-**Should have (v1.x — add early after validation):**
-- Per-DB concurrent processing via `Promise.allSettled` — prevents one slow DB from blocking others; needed before production at any meaningful DB count
-- Cycle-running guard (`isRunning` boolean in `finally` block) — prevents overlapping cron cycles
-- Graceful shutdown handling — NestJS lifecycle hooks; prevents mid-cycle partial dispatches
-- Health check endpoint (`GET /health`) — enables Docker HEALTHCHECK and monitoring
+**Must have (table stakes):**
+- Per-database, per-type rate limiting with per-cycle counter reset — prevents webhook overload
+- Soft limit behavior (log + skip, keep running) — hard stop would break reliability guarantees
+- Message-run dependency check using `botIdentifier` AND `chatDataId` — prevents runs racing ahead of in-flight messages
+- Timeout recovery for messages stuck in `"processing"` — required before dependency enforcement ships or runs can block permanently
+- `processingStartedAt` timestamp on message status change — prerequisite for both dependency check and timeout recovery
 
-**Defer (v2+):**
-- FUP time-window support (`morningLimitFUP` / `nightLimitFUP`) — defer until a client DB actually requires it
-- Configurable retry delay via env var — defer until 1-minute default proves wrong in production
-- Multi-instance idempotent dispatch — single instance with `restart: always` is sufficient for now
+**Should have (differentiators):**
+- Rate limit metrics in cycle logs ("dispatched X/Y limit per database")
+- Dependency chain visibility in logs (run skipped due to N pending messages for chatDataId)
+- Configurable timeout threshold via env var (not hard-coded)
+
+**Defer to v2+:**
+- Per-database rate limit overrides stored in `vars` collection
+- Per-database timeout threshold overrides
+- Timeout recovery dry-run mode (`TIMEOUT_RECOVERY_DRY_RUN=true`)
+- Adaptive/dynamic rate limits based on webhook response times
 
 ### Architecture Approach
 
-The system maps cleanly to five NestJS services in three modules, built in strict dependency order. `MongoService` is the foundation — a singleton that opens one `MongoClient` at startup and provides `db(name)` handles. `DatabaseScanService` uses it to enumerate and filter eligible client databases each cycle. `WebhookDispatchService` owns the HTTP POST, the retry, and the MongoDB status update. `RunDispatchService` orchestrates a full cycle: scan DBs, check time gate, query runs, dispatch each via `WebhookDispatchService`. The `SchedulerModule` wires the cron trigger to `RunDispatchService.runCycle()` and is the last thing assembled.
+All three features integrate into the existing `RunDispatchService` + `WebhookDispatchService` pair without new modules. Rate limiting lives as inline counter logic inside each `processDatabase*` method. Message-run dependency is extracted into a new `MessageCheckService` (injectable, testable in isolation). Timeout recovery runs at the start of `runMessagesCycle` via a new `recoverTimedOutMessages` private method — on a separate slower interval, not inside the dispatch hot path.
 
-**Major components:**
-1. **MongoService** — singleton `MongoClient`; provides `Db` handles by name; opened once at `onModuleInit`, closed at `onModuleDestroy`
-2. **DatabaseScanService** — `listDatabases()` + collection-presence filter; returns eligible DB names per cycle
-3. **WebhookDispatchService** — HTTP POST with explicit timeout; atomic `findOneAndUpdate` claim; single retry via `setTimeout`
-4. **RunDispatchService** — cycle orchestrator; reads `vars`/`webhooks` fresh per DB; enforces time gate; iterates runs; delegates to `WebhookDispatchService`
-5. **SchedulerModule** — wires `CRON_INTERVAL` env var to `RunDispatchService.runCycle()` via `SchedulerRegistry.addCronJob()` at `onModuleInit`
-6. **ConfigService** (`@nestjs/config`) — validates `MONGODB_URI` and `CRON_INTERVAL` at startup; no raw `process.env` in service constructors
+**Key components and changes:**
+
+1. `MessageCheckService` (new) — queries messages collection for blocking conditions; injected into `RunDispatchService`; enables isolated unit testing of the dependency check
+2. `RunDispatchService` (modified) — adds rate limit counters per type, dependency check per run in `processDatabaseRuns`, recovery call at start of `runMessagesCycle`
+3. `WebhookDispatchService.dispatchMessage` (modified) — sets `processingStartedAt` timestamp when marking `"processing"`; returns `boolean` to indicate successful atomic claim (needed for correct rate limit counting)
+
+**Data flow after v1.5 (runs cycle):**
+```
+getEligibleDatabases()
+  → processDatabaseRuns(dbName)
+      → timeTrigger gate [existing]
+      → find eligible runs [existing]
+      → FOR EACH run (up to RATE_LIMIT_RUNS):
+          → MessageCheckService.hasPendingMessages(botIdentifier, chatDataId)?
+              YES → skip, leave "waiting", continue
+              NO  → dispatch() [existing atomic findOneAndUpdate]
+                    → if dispatched: increment counter
+```
+
+**Data flow after v1.5 (messages cycle):**
+```
+runMessagesCycle()
+  → recoverTimedOutMessages() [NEW — runs first, per DB]
+      → updateMany: processing + processingStartedAt <= cutoff → pending
+  → processDatabaseMessages(dbName)
+      → find pending messages [existing]
+      → FOR EACH message (up to RATE_LIMIT_MESSAGES):
+          → dispatch() [existing]
+```
 
 ### Critical Pitfalls
 
-1. **Duplicate dispatch via non-atomic status transition** — use `findOneAndUpdate({ runStatus: "waiting" }, { $set: { runStatus: "processing" } })` as the claim operation; skip the run if no document is returned (another cycle claimed it); this is a day-one requirement, not a retrofit
-2. **Runs stuck in `processing` after a crash** — add a startup recovery pass that resets `{ runStatus: "processing", claimedAt: { $lt: now - 5min } }` back to `waiting`; without this, a service restart orphans in-flight runs permanently
-3. **Overlapping cron cycles causing duplicate processing and memory growth** — gate the cycle function with `isRunning` boolean, reset in `finally`; log a warning when a tick is skipped so operators know the interval is too short
-4. **Timezone misconfiguration** — set `TZ=UTC` in Dockerfile; document that all `morningLimit`/`nightLimit` values in `vars` are UTC hours; test the time-window logic against UTC edge cases explicitly
-5. **No HTTP timeout on webhook calls** — set `timeout: 10_000` on every `axios.post`; without this, one unresponsive endpoint stalls the entire cycle until Node's socket timeout fires (2+ minutes)
+1. **Global rate limiter starves tenants** — Use `Map<dbName, counter>` with `.clear()` at cycle start, never a single shared counter. High-volume clients would consume the entire limit, leaving zero capacity for others (Pitfall 1).
+
+2. **Dependency check missing `botIdentifier` filter** — Always query `{ botIdentifier, chatDataId, messageStatus: 'processing' }`. `chatDataId` values can repeat across bots in the same database; filtering only on `chatDataId` causes cross-bot blocking (Pitfall 6).
+
+3. **`processingStartedAt` field never written** — Timeout recovery is silently a no-op if `dispatchMessage()` does not set this timestamp when changing status to `"processing"`. Implement the schema field in the same commit as the recovery mechanism and test both together (Pitfall 11).
+
+4. **Rate limiter increments on failed atomic claims** — `dispatched++` must only fire after `findOneAndUpdate` returns a non-null document. Incrementing on attempts causes effective dispatch rate to fall below the configured limit (Pitfall 7).
+
+5. **Dependency without timeout recovery ships first** — If the message-run dependency check goes live before timeout recovery, a single stuck "processing" message permanently blocks all runs with the same `chatDataId`. These two features must be deployed together (Pitfall 3).
 
 ## Implications for Roadmap
 
-Based on the component dependency graph (ARCHITECTURE.md "Build Order") and the pitfall-to-phase mapping (PITFALLS.md), the natural build order is bottom-up: foundation first, dispatch logic second, integration and hardening third, operational layer last. The "looks done but isn't" checklist from PITFALLS.md should be the acceptance gate for Phase 2.
+Based on research, the dependency graph dictates a clear 3-phase implementation order.
 
-### Phase 1: Foundation — Config, MongoDB Connection, Database Discovery
+### Phase 1: Rate Limiting
 
-**Rationale:** Every other component depends on `ConfigService` and `MongoService`. Getting the singleton MongoDB connection pattern right before any iteration logic is written prevents the connection pool exhaustion pitfall. Database discovery is purely read-only and has no dispatch risk.
+**Rationale:** Independent feature with no prerequisites. Establishes the dispatch loop structure (counter, early-exit, log-on-limit) that phases 2 and 3 extend. Simplest to implement and test in isolation.
 
-**Delivers:** A running NestJS application that can connect to MongoDB, enumerate client databases, filter by collection presence, and log the results. No dispatch logic yet. Proves the infrastructure works against real MongoDB.
+**Delivers:** Configurable cap on webhooks dispatched per database per cycle, across all three dispatch types independently.
 
-**Addresses:** MongoDB multi-DB enumeration, startup env validation, Docker container operation, structured logging
-
-**Avoids:** Connection pool exhaustion (Pitfall 4) — singleton pattern established before any parallel database access is written
-
-**Research flag:** Standard patterns — no additional research needed; MongoDB native driver singleton and NestJS config patterns are well-documented
-
----
-
-### Phase 2: Core Dispatch Loop — Scheduling, Time Gate, Atomic Claim, Webhook POST, Retry
-
-**Rationale:** This is the highest-risk phase; all critical pitfalls concentrate here. The atomic claim pattern, the `isRunning` guard, the timezone handling, and the HTTP timeout must all be built correctly together. The "looks done but isn't" checklist from PITFALLS.md is the acceptance criterion for this phase.
-
-**Delivers:** A fully functional dispatch loop: cron fires, eligible databases are identified, time window is checked, runs are atomically claimed and dispatched via HTTP POST, status is updated to `queued`, and failures get a single 1-minute retry. The service can run in Docker against real data.
-
-**Addresses:** Cron polling loop, run eligibility detection, time-of-day gating, webhook dispatch, atomic status transition, duplicate dispatch prevention, single-retry on failure, config re-read every cycle
+**Addresses:** Per-database limit, per-type independence, soft limit behavior, per-cycle reset.
 
 **Avoids:**
-- Duplicate dispatch (Pitfall 1) — `findOneAndUpdate` atomic claim required from the first commit of dispatch logic
-- Stuck `processing` runs (Pitfall 3) — startup recovery pass required in same phase
-- Overlapping cron cycles (Pitfall 2) — `isRunning` guard required before the scheduler is wired
-- Timezone errors (Pitfall 5) — `TZ=UTC` in Dockerfile; time-window unit tests against UTC edge cases
-- Webhook timeout (Pitfall 6) — `timeout: 10_000` on every `axios.post` from day one
+- Pitfall 1 (global limiter starves tenants) — design `Map<dbName, counter>` first
+- Pitfall 5 (shared limit across types) — three separate limiters, one per dispatch type
+- Pitfall 7 (count attempts vs. successes) — increment only after successful `findOneAndUpdate`
 
-**Uses:** `@nestjs/schedule` via `SchedulerRegistry.addCronJob()` (not `@Cron()` decorator — env var interval requires runtime registration)
+### Phase 2: processingStartedAt Timestamp + Message-Run Dependency
 
-**Research flag:** Standard patterns — dispatch loop, atomic MongoDB update, NestJS scheduler patterns are all well-documented. No additional research needed; the PITFALLS.md checklist is the key reference.
+**Rationale:** The `processingStartedAt` field is a shared prerequisite for both dependency checking and timeout recovery. Adding it here is low-risk (additive schema change) and unblocks Phase 3. The dependency check itself ships in this phase; timeout recovery is designed concurrently so both go live before production traffic hits the dependency logic.
 
----
+**Delivers:** Runs blocked from dispatching while related messages are actively processing; runs retry next cycle automatically. The `processingStartedAt` timestamp lands on messages, enabling Phase 3.
 
-### Phase 3: Operational Hardening — Concurrency, Graceful Shutdown, Health Check, Observability
+**Uses:** `MessageCheckService` (new injectable), `countDocuments` query, compound filter on `botIdentifier + chatDataId + messageStatus`.
 
-**Rationale:** Once the core loop is proven correct in production or staging, sequential database processing should be parallelized before load grows. This phase adds production-quality operational features with no dispatch logic changes — only the execution model and observability layer change.
+**Avoids:**
+- Pitfall 2 (race condition — check only `"processing"`, not `"pending"`)
+- Pitfall 6 (missing `botIdentifier` filter)
+- Pitfall 9 (O(runs) queries — pre-fetch processing messages per DB as a single query, then use in-memory map for O(1) lookup per run)
+- Pitfall 11 (timestamp missing — same commit as recovery mechanism)
 
-**Delivers:** Parallel per-DB processing via `Promise.allSettled` (with concurrency cap), graceful shutdown via NestJS lifecycle hooks, `GET /health` endpoint with last-cycle stats, cycle summary log (single line: DBs scanned, runs dispatched, runs skipped, errors).
+### Phase 3: Timeout Recovery
 
-**Addresses:** Per-DB concurrent processing, graceful shutdown, health check endpoint, cycle summary metrics
+**Rationale:** Dependency-blocking feature — stuck messages permanently block runs without this. Must deploy alongside or before Phase 2 goes live. Requires the `processingStartedAt` timestamp field from Phase 2.
 
-**Avoids:** Sequential processing bottleneck — serial iteration at 30+ DBs × 300ms approaches the cron interval and causes the `isRunning` guard to fire constantly
+**Delivers:** Messages stuck in `"processing"` for longer than `MESSAGE_TIMEOUT_MINUTES` automatically reset to `"pending"`, unblocking dependent runs without manual intervention.
 
-**Research flag:** Standard patterns — `Promise.allSettled`, NestJS `onApplicationShutdown`, minimal NestJS controller; no additional research needed
-
----
-
-### Phase 4: Docker Packaging and Deployment Validation
-
-**Rationale:** Docker packaging should be validated as a dedicated step, not assumed to work. The `TZ=UTC` environment variable, connection string with all replica set nodes, and env-based configuration must all be verified in a container environment before declaring the service production-ready.
-
-**Delivers:** Production Dockerfile (`node:22-alpine`), Docker Compose for local testing, verified `TZ=UTC` behavior, validated replica set connection string format, deployment documentation.
-
-**Addresses:** Docker container operation, replica set connection string format (all 3 nodes), `TZ=UTC` enforcement
-
-**Avoids:** Silent timezone divergence between local dev (where `Date.getHours()` uses local TZ) and Docker (UTC); single-node MongoDB URI that loses connections on primary failover
-
-**Research flag:** Standard patterns — Docker, NestJS deployment patterns are well-documented; no additional research needed
-
----
+**Avoids:**
+- Pitfall 3 (dependency deadlock from stuck messages)
+- Pitfall 4 (permanent processing state)
+- Pitfall 8 (recovery embedded in dispatch loop — use a separate slower interval, not the 5-second hot path)
 
 ### Phase Ordering Rationale
 
-- **Foundation before dispatch:** `MongoService` and `ConfigService` are dependencies of every other component; building them first allows all subsequent phases to import them without mocks
-- **All critical pitfalls in Phase 2:** Duplicate dispatch, stuck processing states, overlapping cycles, timezone errors, and HTTP timeouts are all impossible to retrofit safely into an already-deployed service; they must be built correctly in the same phase that introduces dispatch logic
-- **Concurrency after correctness:** Parallel database processing (`Promise.allSettled`) changes the error isolation model; it should only be added once the sequential loop is verified correct, so bugs are not attributed to concurrency
-- **Docker last:** Packaging validation requires the full application to exist; doing it earlier produces a container that gets rebuilt with every Phase 2 change
+- Phase 1 first because it is fully independent and low-risk; validates the counter pattern before adding query complexity.
+- Phases 2 and 3 are tightly coupled — dependency enforcement without recovery creates an unbounded blocking condition. The `processingStartedAt` timestamp lands in Phase 2; timeout recovery ships in Phase 3 but should be deployed together with Phase 2 before production traffic reaches the dependency check.
+- All three phases are purely additive — no structural changes to existing services, no schema migrations, no breaking changes to deployment config.
+- Backwards-compatible: rate limit env vars have defaults, dependency check is transparent to unaffected runs, recovery is a no-op when no messages are stuck.
 
 ### Research Flags
 
-Phases likely needing deeper research during planning:
-- **None identified** — all patterns are well-established for this domain. The PITFALLS.md "Looks Done But Isn't" checklist should be the Phase 2 acceptance gate, and ARCHITECTURE.md provides code-level patterns with examples.
+Phases with standard patterns (skip additional research):
+- **Phase 1 (Rate Limiting):** Well-established pattern; `Map<dbName, counter>` with cycle-scoped reset is idiomatic and completely understood.
+- **Phase 3 (Timeout Recovery):** Standard dead-letter-queue recovery pattern; `updateMany` with timestamp filter is stable MongoDB API.
 
-Phases with standard patterns (skip research-phase):
-- **All phases** — NestJS scheduler, MongoDB native driver multi-DB, `Promise.allSettled`, Docker packaging are all thoroughly documented. Implementation can proceed directly from the research files.
-
-One area to validate during Phase 2 implementation: whether `@nestjs/schedule` v4.x's `SchedulerRegistry.addCronJob()` API differs from v3.x in any way relevant to dynamic interval registration. Verify against npm before installing.
+Phases that need validation before implementation:
+- **Phase 2 (Message-Run Dependency):** Requires confirming that `runs` documents actually contain `chatDataId` and `botIdentifier` fields. Research assumes yes based on codebase analysis, but this must be verified against real data before writing the dependency query filter.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Verified directly from installed lockfile and `node_modules`; only `@nestjs/schedule` v4.x compatibility is MEDIUM — verify on npm before installing |
-| Features | HIGH | Requirements fully specified in PROJECT.md; all features map directly to stated requirements; domain patterns well-established |
-| Architecture | HIGH | NestJS scheduler and MongoDB multi-database patterns are well-documented; component boundaries are clear with no novel techniques required |
-| Pitfalls | HIGH | All pitfalls drawn from established failure patterns in distributed cron systems and MongoDB native driver behavior; directly applicable to this architecture |
+| Stack | HIGH | Verified against installed package.json; all required APIs exist in current driver versions; zero new packages needed |
+| Features | MEDIUM-HIGH | Pattern analysis from existing codebase; run document schema fields (`chatDataId`) assumed but not confirmed in live production data |
+| Architecture | HIGH | Integration points derived from direct codebase analysis of run-dispatch.service.ts and webhook-dispatch.service.ts |
+| Pitfalls | HIGH | Drawn from established multi-tenant dispatch patterns and MongoDB concurrency documentation |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **`@nestjs/schedule` v4.x version compatibility:** Training data indicates v4.x targets NestJS 11, but this should be verified on npm before running `pnpm add @nestjs/schedule`. Install the wrong major and NestJS module resolution will fail silently.
-- **`morningLimit`/`nightLimit` timezone convention:** The research recommends UTC, but the actual convention used in existing client `vars` documents is unknown. This must be confirmed before deploying the time-gate logic — wrong assumption here means runs dispatch at wrong hours in production without any error.
-- **MongoDB replica set topology:** The `MONGODB_URI` must include all three replica set nodes. The actual connection string format in use (whether it already includes all nodes or points to a single host) should be confirmed before production deployment.
-- **"Processador de Runs" webhook document structure:** The `webhooks` collection key that identifies the dispatch URL must be confirmed against a real database document. The research assumes a `botIdentifier`-keyed lookup, but the exact field path needs validation in Phase 2.
+- **`chatDataId` on run documents:** Research assumes run documents include `chatDataId` for the dependency filter. Confirm this field exists in production data before implementing Phase 2. If absent, the dependency feature requires a schema extension.
+- **Existing indexes on messages collection:** Dependency check queries `(botIdentifier, chatDataId, messageStatus)` and timeout recovery queries `(messageStatus, processingStartedAt)`. Profile query performance on real data before deciding if compound indexes are required at launch.
+- **Typical message processing duration:** The 10-minute timeout default is a reasonable assumption. Validate against real client data to confirm it does not prematurely recover legitimately slow messages.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- `/root/time-trigger-api/pnpm-lock.yaml` — authoritative installed versions (NestJS 11.1.17, mongodb 7.1.1, TypeScript 5.9.3, Jest 30)
-- `/root/time-trigger-api/node_modules/@nestjs/common/package.json` — confirmed NestJS 11.1.17
-- `/root/time-trigger-api/node_modules/mongodb/package.json` — confirmed mongodb 7.1.1
-- `/root/time-trigger-api/.planning/PROJECT.md` — authoritative requirements source for all features
-- MongoDB Node.js driver documentation — `MongoClient` connection pooling, `findOneAndUpdate`, `listDatabases`
-- NestJS official documentation — `@nestjs/schedule` task scheduling patterns, lifecycle hooks
-- Node.js / axios default timeout behavior — documented absence of default timeout
+- `/root/time-trigger-api/src/dispatch/run-dispatch.service.ts` — existing cycle structure, isRunning guards, database iteration patterns
+- `/root/time-trigger-api/src/dispatch/webhook-dispatch.service.ts` — atomic `findOneAndUpdate` pattern, existing `dispatchMessage` implementation
+- `/root/time-trigger-api/package.json` — confirmed installed versions (NestJS 11.0.1, MongoDB 7.1.1, @nestjs/config 4.0.3)
 
 ### Secondary (MEDIUM confidence)
-- `@nestjs/schedule` v4.x compatibility with NestJS 11 — training data consensus; verify on npm before installing
-- `SchedulerRegistry.addCronJob()` API for dynamic interval at runtime — established pattern for env-var-driven cron intervals in NestJS
+- MongoDB 7.1.1 native driver API — `countDocuments`, `updateMany`, compound query operators (stable since v3.x)
+- Training data: NestJS injectable service patterns, per-tenant rate limiting, dead-letter-queue timeout recovery
 
 ---
-*Research completed: 2026-03-25*
+*Research completed: 2026-03-29*
 *Ready for roadmap: yes*

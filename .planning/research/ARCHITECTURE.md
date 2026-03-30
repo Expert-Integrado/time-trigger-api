@@ -1,335 +1,534 @@
-# Architecture Research
+# Architecture Research: Rate Limiting and Message-Run Dependency
 
-**Domain:** Cron-based multi-database webhook dispatch service
-**Researched:** 2026-03-25
-**Confidence:** HIGH — NestJS scheduler patterns and MongoDB native driver multi-database patterns are well-established; no novel or speculative techniques required for this system.
+**Domain:** Rate limiting and message-run dependency for cron-based webhook dispatch
+**Researched:** 2026-03-29
+**Confidence:** HIGH — Integration patterns based on existing architecture; rate limiting and dependency checking are well-established patterns in NestJS/MongoDB systems.
 
-## Standard Architecture
+## Executive Summary
 
-### System Overview
+This research covers how to integrate **per-database rate limiting** and **message-run dependency checking** into the existing Time Trigger API architecture without disrupting the 3-interval independent dispatch system shipped in v1.4.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        NestJS Application                        │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │                    SchedulerModule                        │   │
-│  │  @Cron / setInterval (CRON_INTERVAL env var)              │   │
-│  └──────────────────────┬───────────────────────────────────┘   │
-│                         │ triggers                              │
-│  ┌──────────────────────▼───────────────────────────────────┐   │
-│  │                   RunDispatchService                       │   │
-│  │  - Orchestrates one full execution cycle                  │   │
-│  │  - Iterates over eligible databases                       │   │
-│  │  - Enforces time-of-day gate                              │   │
-│  │  - Delegates to sub-services                              │   │
-│  └───┬──────────────────┬───────────────────────────────────┘   │
-│      │                  │                                        │
-│  ┌───▼──────────┐  ┌────▼───────────────────────────────────┐   │
-│  │ DatabaseScan │  │           WebhookDispatchService        │   │
-│  │  Service     │  │  - POSTs run document to webhook URL    │   │
-│  │  - Lists DBs │  │  - Handles HTTP success / failure       │   │
-│  │  - Filters   │  │  - Executes single retry after 1 min    │   │
-│  │    by        │  └────────────────────────────────────────┘   │
-│  │  collections │                                               │
-│  └───┬──────────┘                                               │
-│      │                                                          │
-│  ┌───▼──────────────────────────────────────────────────────┐   │
-│  │                     MongoService                          │   │
-│  │  - Owns single MongoClient (shared across all DBs)        │   │
-│  │  - Provides Db handles by name                            │   │
-│  │  - listDatabases(), getCollection() helpers               │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                  │
-├─────────────────────────────────────────────────────────────────┤
-│                     External Boundaries                          │
-│  ┌──────────────────────┐   ┌────────────────────────────────┐  │
-│  │  MongoDB Replica Set │   │  Webhook Endpoints (HTTP POST) │  │
-│  │  (3 nodes, N client  │   │  ("Processador de Runs" per DB)│  │
-│  │   databases)         │   └────────────────────────────────┘  │
-│  └──────────────────────┘                                       │
-└─────────────────────────────────────────────────────────────────┘
-```
+**Key findings:**
+1. Rate limiting integrates cleanly at the **per-database processing level** (inside `processDatabase*` methods)
+2. Message-run dependency requires a **new query service** to check messages before dispatching runs
+3. Auto-timeout recovery fits naturally in **runMessagesCycle** as a pre-dispatch cleanup step
+4. All features are **additive** — no structural changes to existing services
 
-### Component Responsibilities
+## Existing Architecture Context
 
-| Component | Responsibility | Notes |
-|-----------|----------------|-------|
-| **SchedulerModule** | Fires the cron trigger on configurable interval | Uses `@nestjs/schedule`; interval set from `CRON_INTERVAL` env var at startup |
-| **RunDispatchService** | Orchestrates the full dispatch cycle end-to-end | Entry point of each cron tick; owns the per-database iteration loop |
-| **DatabaseScanService** | Discovers and filters eligible client databases | Lists all MongoDB databases; keeps only those with `runs`, `webhooks`, and `vars` collections |
-| **WebhookDispatchService** | Sends a single run to its webhook; handles retry | Issues HTTP POST; on failure, waits 1 minute and retries once; writes result back to MongoDB |
-| **MongoService** | Manages the single shared `MongoClient` | Opened once at app startup; provides `Db` handles on demand; closed on app shutdown |
-| **ConfigService** | Reads and validates environment variables | Wraps `process.env`; surfaces `MONGODB_URI`, `CRON_INTERVAL`; validated at startup |
-
-## Recommended Project Structure
+### Current Component Structure
 
 ```
-src/
-├── scheduler/
-│   └── scheduler.module.ts      # Imports @nestjs/schedule, registers RunDispatchService as cron handler
-├── dispatch/
-│   ├── dispatch.module.ts       # Feature module
-│   ├── run-dispatch.service.ts  # Orchestrates one cycle: scan DBs → gate time → dispatch runs
-│   └── webhook-dispatch.service.ts  # HTTP POST to webhook, retry logic, status update
-├── database/
-│   ├── database.module.ts       # Global module
-│   ├── mongo.service.ts         # MongoClient lifecycle (connect/disconnect), Db accessors
-│   └── database-scan.service.ts # listDatabases(), filter by required collections
-├── config/
-│   └── config.service.ts        # MONGODB_URI, CRON_INTERVAL, env validation
-└── main.ts                      # Bootstrap, graceful shutdown hook
+SchedulerService (3 independent setIntervals)
+    ├── runRunsCycle() → RunDispatchService.runRunsCycle()
+    ├── runFupCycle() → RunDispatchService.runFupCycle()
+    └── runMessagesCycle() → RunDispatchService.runMessagesCycle()
+
+RunDispatchService
+    ├── processDatabaseRuns(dbName)
+    │   ├── Read vars (timeTrigger gate)
+    │   ├── Read webhooks
+    │   ├── Find eligible runs
+    │   └── Dispatch via WebhookDispatchService
+    ├── processDatabaseFup(dbName)
+    └── processDatabaseMessages(dbName)
+
+WebhookDispatchService
+    ├── dispatch(db, run, url) → POST + atomic status update
+    ├── dispatchFup(db, fup, url)
+    └── dispatchMessage(db, message, url)
 ```
 
-### Structure Rationale
+### Current Data Flow
 
-- **scheduler/:** Isolates the cron trigger setup. The only concern here is "when to fire" — nothing else. Makes it trivial to change schedule mechanism later.
-- **dispatch/:** Owns the business logic. Two services with a clear split: `run-dispatch` is the coordinator; `webhook-dispatch` owns I/O to the external HTTP endpoint. Testing each independently is straightforward.
-- **database/:** Owns all MongoDB concerns. A single `MongoService` singleton means one connection pool shared across all operations. `DatabaseScanService` only handles discovery/filtering — it never touches run documents.
-- **config/:** Central validation at startup prevents runtime surprises from missing env vars. Keeps service constructors clean.
+```
+CRON tick
+    ↓
+runRunsCycle()
+    ↓
+getEligibleDatabases() → [db1, db2, ...]
+    ↓
+Promise.allSettled(databases.map(processDatabaseRuns))
+    ↓
+For each database:
+    → Read vars/webhooks (fresh)
+    → Apply timeTrigger gates
+    → Find eligible runs
+    → FOR EACH RUN: dispatch()
+```
 
-## Architectural Patterns
+## Integration Architecture
 
-### Pattern 1: Single MongoClient, Multiple Db Handles
+### 1. Rate Limiting Architecture
 
-**What:** One `MongoClient` instance is created at app startup (via `OnModuleInit`) and destroyed at shutdown (via `OnModuleDestroy`). Per-database access is done by calling `client.db(dbName)` — no separate connections per database.
+**Requirement:** Stop after N webhooks per dispatch type per cycle per database (e.g., 10 runs, 10 FUPs, 10 messages).
 
-**When to use:** Any system that needs to address multiple databases on the same MongoDB deployment. The native driver's connection pool handles multiplexing; opening separate clients per database wastes sockets and adds handshake latency.
+#### Integration Point
 
-**Trade-offs:** Single point of connection failure (acceptable — if Mongo is down, all databases are unreachable anyway). Connection pool is shared so large parallel query volumes must be monitored against `maxPoolSize`.
+Insert rate limiting **inside each `processDatabase*` method**, immediately after the query but before the dispatch loop.
 
-**Example:**
+**Why this location:**
+- Per-database isolation (each DB gets own limit counter)
+- Per-cycle isolation (counter resets each cycle)
+- Per-type isolation (runs, FUP, messages each have own limit)
+- No cross-contamination between independent intervals
+
+#### Pattern: Inline Counter with Early Exit
+
 ```typescript
-@Injectable()
-export class MongoService implements OnModuleInit, OnModuleDestroy {
-  private client: MongoClient;
+private async processDatabaseRuns(dbName: string): Promise<void> {
+  const db: Db = this.mongoService.db(dbName);
 
-  async onModuleInit() {
-    this.client = new MongoClient(process.env.MONGODB_URI);
-    await this.client.connect();
-  }
+  // Existing timeTrigger gate logic...
 
-  async onModuleDestroy() {
-    await this.client.close();
-  }
+  const runs: Document[] = await db
+    .collection('runs')
+    .find({ runStatus: 'waiting', waitUntil: { $lte: Date.now() } })
+    .toArray();
 
-  db(name: string): Db {
-    return this.client.db(name);
-  }
-
-  async listDatabases(): Promise<string[]> {
-    const result = await this.client.db('admin').command({ listDatabases: 1 });
-    return result.databases.map((d: { name: string }) => d.name);
-  }
-}
-```
-
-### Pattern 2: Re-read Config Collections Every Cycle
-
-**What:** `vars` and `webhooks` documents are fetched fresh on every cron tick, not cached. Each database's `vars` collection is queried for `morningLimit`/`nightLimit` and `webhooks` is queried for the "Processador de Runs" URL immediately before processing that database's runs.
-
-**When to use:** When external systems can mutate configuration at any time and stale config would cause incorrect behavior (dispatching runs outside allowed hours, or to a stale URL).
-
-**Trade-offs:** Adds 2 extra MongoDB reads per database per cycle. For dozens of databases this is tens of milliseconds of extra latency — negligible compared to the cron interval. Correctness wins.
-
-**Example:**
-```typescript
-async procesDatabase(dbName: string): Promise<void> {
-  const db = this.mongoService.db(dbName);
-  const vars = await db.collection('vars').findOne({});
-  const webhookDoc = await db.collection('webhooks').findOne({ botIdentifier: { $exists: true } });
-
-  if (!this.isWithinTimeWindow(vars?.morningLimit, vars?.nightLimit)) return;
-
-  const runs = await db.collection('runs').find({
-    runStatus: 'waiting',
-    waitUntil: { $lte: new Date() },
-  }).toArray();
+  // NEW: Rate limiting — process at most N runs per cycle
+  const limit = this.configService.get<number>('RATE_LIMIT_RUNS', 10);
+  const dispatched = 0;
 
   for (const run of runs) {
-    await this.webhookDispatchService.dispatch(db, run, webhookDoc.url);
+    if (dispatched >= limit) {
+      this.logger.log(
+        `[${dbName}] Rate limit reached: ${dispatched}/${limit} runs dispatched`
+      );
+      break;
+    }
+
+    await this.webhookDispatchService.dispatch(db, run, webhookUrl);
+    dispatched++;
   }
 }
 ```
 
-### Pattern 3: Optimistic Status Update with Single Retry
+**Trade-offs:**
+- **Pro:** Simple, stateless, no shared state between databases or cycles
+- **Pro:** Limit enforced even if MongoDB returns 1000 eligible runs
+- **Con:** Does not throttle MongoDB query size (but acceptable — query is fast)
 
-**What:** On a successful webhook POST, the run document is immediately updated to `runStatus: "queued"` with `queuedAt: new Date()`. On failure, a single retry fires after 1 minute (via `setTimeout`). If the retry also fails, the run is left as `runStatus: "waiting"` — it will be picked up again on the next cron tick.
+#### Configuration
 
-**When to use:** When duplicate dispatch is a hard constraint (idempotency via status field) and retry complexity must be kept minimal.
+Add 3 new optional env vars:
+```bash
+RATE_LIMIT_RUNS=10       # Default 10
+RATE_LIMIT_FUP=10        # Default 10
+RATE_LIMIT_MESSAGES=10   # Default 10
+```
 
-**Trade-offs:** The 1-minute retry window means a run may be dispatched slightly late. However the next cron cycle would also pick it up, so the retry is purely a best-effort fast-path. The `runStatus: "queued"` guard prevents double dispatch.
+**Why per-type limits:** Different dispatch types have different performance characteristics. Messages have no time gate and may queue aggressively — independent limit prevents message volume from affecting runs.
 
-**Example:**
+### 2. Message-Run Dependency Architecture
+
+**Requirement:** Before dispatching a run, check if any messages with same `botIdentifier` + `chatDataId` are still `messageStatus: "processing"`. If yes, skip the run (leave as `waiting`).
+
+#### Integration Point
+
+Insert dependency check **inside `processDatabaseRuns`**, after rate limit check but before individual dispatch.
+
+#### Pattern: Pre-Dispatch Query
+
 ```typescript
-async dispatch(db: Db, run: Document, webhookUrl: string): Promise<void> {
-  const success = await this.post(webhookUrl, run);
-  if (success) {
-    await db.collection('runs').updateOne(
-      { _id: run._id },
-      { $set: { runStatus: 'queued', queuedAt: new Date() } },
+private async processDatabaseRuns(dbName: string): Promise<void> {
+  // ... existing gates and query ...
+
+  for (const run of runs) {
+    if (dispatched >= limit) break;
+
+    // NEW: Message-run dependency check
+    const hasBlockingMessages = await this.messageCheckService.hasPendingMessages(
+      db,
+      run.botIdentifier,
+      run.chatDataId
     );
+
+    if (hasBlockingMessages) {
+      this.logger.debug(
+        `[${dbName}] Run ${run._id} blocked by pending messages (botIdentifier=${run.botIdentifier}, chatDataId=${run.chatDataId})`
+      );
+      continue; // Skip this run, leave as "waiting"
+    }
+
+    await this.webhookDispatchService.dispatch(db, run, webhookUrl);
+    dispatched++;
+  }
+}
+```
+
+#### New Component: MessageCheckService
+
+**Purpose:** Encapsulate message-related queries to keep RunDispatchService focused on orchestration.
+
+**Responsibility:** Query `messages` collection for blocking conditions.
+
+**Interface:**
+```typescript
+@Injectable()
+export class MessageCheckService {
+  async hasPendingMessages(
+    db: Db,
+    botIdentifier: string,
+    chatDataId: string
+  ): Promise<boolean> {
+    const count = await db.collection('messages').countDocuments({
+      botIdentifier,
+      chatDataId,
+      messageStatus: 'processing',
+    });
+    return count > 0;
+  }
+}
+```
+
+**Why a separate service:**
+- **Testability:** Mock message checks without touching RunDispatchService
+- **Reusability:** Other dispatch types may need similar checks later
+- **Clarity:** RunDispatchService doesn't need to know MongoDB query syntax for messages
+
+**Trade-offs:**
+- **Pro:** Clean separation of concerns
+- **Pro:** One query per run (not per cycle) — only runs that pass rate limit incur query cost
+- **Con:** Adds latency per run (~5-10ms per query) — acceptable for sub-limit runs
+
+### 3. Auto-Timeout Recovery Architecture
+
+**Requirement:** Messages stuck in `messageStatus: "processing"` for >10 minutes should be reset to `"pending"` so they can be retried.
+
+#### Integration Point
+
+Insert timeout recovery **at the start of `runMessagesCycle`**, before finding eligible messages.
+
+**Why this location:**
+- Messages cycle has no time gate (runs 24/7) — cleanup executes frequently
+- Cleanup before query ensures timed-out messages are immediately eligible
+- Independent of rate limiting (cleanup is not dispatching)
+
+#### Pattern: Pre-Cycle Cleanup
+
+```typescript
+async runMessagesCycle(): Promise<void> {
+  if (this.isRunningMessages) {
+    this.logger.warn('Messages cycle skipped — previous cycle still running');
     return;
   }
-  // Single retry after 1 minute
-  setTimeout(async () => {
-    const retrySuccess = await this.post(webhookUrl, run);
-    if (retrySuccess) {
-      await db.collection('runs').updateOne(
-        { _id: run._id },
-        { $set: { runStatus: 'queued', queuedAt: new Date() } },
-      );
+  this.isRunningMessages = true;
+
+  try {
+    this.logger.log('Messages cycle started');
+    const databases = await this.databaseScanService.getEligibleDatabases();
+
+    // NEW: Auto-timeout recovery — run first, before dispatching
+    await Promise.allSettled(
+      databases.map((dbName) => this.recoverTimedOutMessages(dbName))
+    );
+
+    // Existing dispatch logic
+    const results = await Promise.allSettled(
+      databases.map((dbName) => this.processDatabaseMessages(dbName))
+    );
+
+    // ... existing error handling and logging ...
+  } finally {
+    this.isRunningMessages = false;
+  }
+}
+
+private async recoverTimedOutMessages(dbName: string): Promise<void> {
+  const db: Db = this.mongoService.db(dbName);
+  const timeoutMs = this.configService.get<number>(
+    'MESSAGE_TIMEOUT_MINUTES',
+    10
+  ) * 60_000;
+  const cutoff = Date.now() - timeoutMs;
+
+  const result = await db.collection('messages').updateMany(
+    {
+      messageStatus: 'processing',
+      processingStartedAt: { $lte: cutoff },
+    },
+    {
+      $set: { messageStatus: 'pending' },
+      $unset: { processingStartedAt: 1 },
     }
-    // If retry fails: leave as "waiting", next cron cycle will pick up
-  }, 60_000);
+  );
+
+  if (result.modifiedCount > 0) {
+    this.logger.warn(
+      `[${dbName}] Recovered ${result.modifiedCount} timed-out messages`
+    );
+  }
 }
 ```
 
-## Data Flow
+**Prerequisites:**
+- Messages collection must track `processingStartedAt` timestamp (set when status changes to `"processing"`)
+- WebhookDispatchService.dispatchMessage must set this timestamp
 
-### Cron Cycle Flow
-
-```
-CRON_INTERVAL fires
-    |
-    v
-RunDispatchService.runCycle()
-    |
-    v
-DatabaseScanService.getEligibleDatabases()
-    |  -- listDatabases() on MongoClient
-    |  -- filter: has runs + webhooks + vars collections
-    |
-    v
-For each eligible database:
-    |
-    +-- db.collection('vars').findOne({})         -- read morningLimit, nightLimit
-    +-- isWithinTimeWindow()?                     -- skip if outside hours
-    +-- db.collection('webhooks').findOne(...)    -- read "Processador de Runs" URL
-    +-- db.collection('runs').find({              -- find eligible runs
-    |       runStatus: "waiting",
-    |       waitUntil: { $lte: now }
-    |   })
-    |
-    v
-For each eligible run:
-    |
-    +-- WebhookDispatchService.dispatch(run, url)
-    |       -- HTTP POST run document to webhook URL
-    |       -- SUCCESS: UPDATE run runStatus="queued", queuedAt=now
-    |       -- FAILURE: setTimeout(retry, 60s)
-    |                   retry: HTTP POST again
-    |                   SUCCESS: UPDATE run runStatus="queued"
-    |                   FAILURE: leave as "waiting" (next cycle picks up)
-    v
-Cycle complete — wait for next cron tick
+**Configuration:**
+```bash
+MESSAGE_TIMEOUT_MINUTES=10  # Default 10 minutes
 ```
 
-### Status Lifecycle
+**Trade-offs:**
+- **Pro:** Self-healing — stuck messages automatically recover without manual intervention
+- **Pro:** Per-cycle execution frequency matches messages interval (5s default)
+- **Con:** Requires schema change (add `processingStartedAt` field)
+
+## New Components Summary
+
+| Component | Responsibility | Dependencies | Integration Point |
+|-----------|----------------|--------------|-------------------|
+| **MessageCheckService** | Query messages collection for blocking conditions | MongoService | Injected into RunDispatchService |
+| **Rate limit counter** | Inline logic per dispatch type | ConfigService | Inside each `processDatabase*` method |
+| **Timeout recovery** | Reset stuck messages to pending | MongoService, ConfigService | Start of `runMessagesCycle` |
+
+## Modified Components
+
+| Component | What Changes | Why |
+|-----------|--------------|-----|
+| **RunDispatchService** | Add MessageCheckService injection; add rate limit logic + message dependency check in `processDatabaseRuns`; add timeout recovery call in `runMessagesCycle` | Integration point for all 3 features |
+| **WebhookDispatchService.dispatchMessage** | Set `processingStartedAt` timestamp when updating status to "processing" | Required for timeout recovery |
+| **ConfigService / validateEnv** | Add optional env vars: `RATE_LIMIT_*`, `MESSAGE_TIMEOUT_MINUTES` | Configuration for new features |
+
+## Data Flow Changes
+
+### Before (v1.4)
 
 ```
-[External writer sets]        [This service sets]    [External processor sets]
-  runStatus: "waiting"   -->   runStatus: "queued"  -->  runStatus: "done"
-  waitUntil: <timestamp>       queuedAt: <timestamp>
+runRunsCycle()
+  → getEligibleDatabases()
+  → processDatabaseRuns(dbName)
+      → timeTrigger gate
+      → find runs (runStatus: waiting, waitUntil <= now)
+      → FOR EACH run: dispatch()
 ```
 
-### Key Data Flows
+### After (v1.5)
 
-1. **Config discovery:** `vars` document read per database per cycle — time gate values always current. No in-process caching.
-2. **Webhook URL resolution:** `webhooks` document read per database per cycle — URL always current. URL identified by the `"Processador de Runs"` key within the document.
-3. **Run status guard:** `runStatus: "waiting"` filter in MongoDB query is the primary idempotency guard. Once updated to `"queued"`, a run will not appear in future queries.
-4. **Database eligibility filter:** Collection presence check runs on every cycle. A database that gains the required collections mid-operation becomes eligible on the next cycle.
+```
+runRunsCycle()
+  → getEligibleDatabases()
+  → processDatabaseRuns(dbName)
+      → timeTrigger gate
+      → find runs (runStatus: waiting, waitUntil <= now)
+      → FOR EACH run (up to RATE_LIMIT_RUNS):
+          → MessageCheckService.hasPendingMessages()?
+              → YES: skip run (leave waiting)
+              → NO: dispatch()
+```
 
-## Scaling Considerations
+```
+runMessagesCycle()
+  → getEligibleDatabases()
+  → recoverTimedOutMessages(dbName) [NEW — runs first]
+      → updateMany: processing + processingStartedAt < cutoff → pending
+  → processDatabaseMessages(dbName)
+      → find messages (messageStatus: pending)
+      → FOR EACH message (up to RATE_LIMIT_MESSAGES):
+          → dispatch()
+```
 
-This is a headless background service, not a request-serving API. "Scale" here means: more databases to process, more runs per database, or shorter cron intervals.
+## MongoDB Schema Changes
 
-| Scale | Architecture Adjustments |
-|-------|--------------------------|
-| Tens of databases, low run volume | Sequential per-database iteration is fine. Simple and debuggable. |
-| Hundreds of databases OR high run volume | Process databases in parallel batches (`Promise.allSettled` with concurrency limit). Keep batch size configurable. |
-| Sub-minute cron intervals with many DBs | Add a cycle-already-running guard (`isRunning` flag) so overlapping cycles don't pile up if one cycle takes longer than the interval. |
+### messages collection
 
-### Scaling Priorities
+**New field:** `processingStartedAt: number` (timestamp)
 
-1. **First bottleneck:** Sequential database iteration. With 50+ databases each requiring 3 MongoDB reads before any dispatching starts, latency accumulates. Fix: parallelise database processing with a concurrency cap (e.g. 10 at a time via `p-limit`).
-2. **Second bottleneck:** MongoDB connection pool exhaustion under parallel load. Fix: configure `maxPoolSize` on `MongoClient` options to match expected concurrency.
+**When set:** WebhookDispatchService.dispatchMessage sets it during `findOneAndUpdate` when changing status to "processing"
 
-## Anti-Patterns
+**When unset:** Timeout recovery clears it when resetting to "pending"
 
-### Anti-Pattern 1: One MongoClient Per Database
+**Query pattern:**
+```typescript
+// Timeout recovery
+db.collection('messages').updateMany(
+  {
+    messageStatus: 'processing',
+    processingStartedAt: { $lte: Date.now() - timeoutMs }
+  },
+  {
+    $set: { messageStatus: 'pending' },
+    $unset: { processingStartedAt: 1 }
+  }
+);
+```
 
-**What people do:** Open a new `MongoClient(uri + '/' + dbName)` for each client database, then close it after processing.
-
-**Why it's wrong:** Creates a new TCP connection + TLS handshake + auth round-trip per database per cycle. With dozens of databases this becomes hundreds of connection setups per minute, slamming the replica set.
-
-**Do this instead:** One shared `MongoClient` connected to the replica set. Use `client.db(dbName)` to switch databases on the same connection pool.
-
-### Anti-Pattern 2: Caching vars/webhooks Between Cycles
-
-**What people do:** Read `morningLimit`, `nightLimit`, and webhook URL once at startup (or at the first cycle), store them in service fields, and reuse across cycles.
-
-**Why it's wrong:** External systems change these values at runtime. A stale `morningLimit` causes runs to be dispatched outside allowed hours. A stale webhook URL silently dispatches to the wrong endpoint.
-
-**Do this instead:** Read `vars` and `webhooks` at the start of each database's processing block within every cycle. The additional MongoDB reads are cheap.
-
-### Anti-Pattern 3: Blocking the Event Loop During Per-DB Iteration
-
-**What people do:** Use a synchronous `for` loop with `await` inside, processing 50 databases sequentially before returning.
-
-**Why it's wrong:** A single slow database (network hiccup, large cursor) blocks all other databases for the entire cycle duration. With a short cron interval, cycles start piling up.
-
-**Do this instead:** Use `Promise.allSettled` with a concurrency limiter. Each database processes independently; one slow database does not delay others.
-
-### Anti-Pattern 4: Skipping the Cycle-Running Guard
-
-**What people do:** Fire the cron tick function unconditionally regardless of whether the previous cycle is still executing.
-
-**Why it's wrong:** If a cycle takes longer than `CRON_INTERVAL` (e.g., slow webhooks + retries in flight), the next tick launches a second parallel cycle that reads the same `runStatus: "waiting"` documents before the first cycle finishes updating them. This creates duplicate dispatches.
-
-**Do this instead:** Gate the cycle function with an `isRunning` boolean flag. Skip the tick if a cycle is already in progress. Log a warning so the operator knows the interval is too short.
-
-## Integration Points
-
-### External Services
-
-| Service | Integration Pattern | Notes |
-|---------|---------------------|-------|
-| MongoDB Replica Set | Native driver `MongoClient` with replica set URI | URI includes all 3 nodes (`host1:port,host2:port,host3:port`); driver handles primary election automatically |
-| Webhook Endpoints | HTTP POST via Node `fetch` (Node 18+) or `axios` | One unique URL per client database; URL read from `webhooks` collection each cycle |
-
-### Internal Boundaries
-
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| SchedulerModule → RunDispatchService | Direct method call (NestJS DI) | Scheduler calls `runCycle()` on the service; no events or queues needed |
-| RunDispatchService → DatabaseScanService | Direct method call (injected dependency) | Returns list of eligible DB names; pure query, no side effects |
-| RunDispatchService → WebhookDispatchService | Direct method call (injected dependency) | Passes `Db` handle, run document, and webhook URL; service owns all I/O for that run |
-| RunDispatchService → MongoService | Direct method call (injected dependency) | Calls `db(name)` to get a `Db` handle; no raw `MongoClient` access outside this service |
-| WebhookDispatchService → MongoService | Direct method call (injected dependency) | Updates run status after dispatch; uses the `Db` handle passed in from the orchestrator |
+**Index recommendation:**
+```typescript
+db.collection('messages').createIndex(
+  { messageStatus: 1, processingStartedAt: 1 },
+  { sparse: true }
+);
+```
+Sparse index because `processingStartedAt` only exists on "processing" messages.
 
 ## Build Order
 
-The component dependency graph drives implementation order:
+Dependency graph for implementation:
 
 ```
-1. ConfigService          -- no dependencies; needed by everything
-2. MongoService           -- depends on ConfigService; needed by database + dispatch layers
-3. DatabaseScanService    -- depends on MongoService
-4. WebhookDispatchService -- depends on MongoService (for status updates)
-5. RunDispatchService     -- depends on DatabaseScanService + WebhookDispatchService
-6. SchedulerModule        -- depends on RunDispatchService; wired last
+1. MessageCheckService (new)
+   - Pure query service, no dependencies beyond MongoService
+   - Test: mock Db, verify query structure
+
+2. Rate limiting logic (inline)
+   - Add to each processDatabase* method
+   - Test: verify loop breaks at limit
+
+3. Message-run dependency (integration)
+   - Inject MessageCheckService into RunDispatchService
+   - Add check before dispatch in processDatabaseRuns
+   - Test: mock MessageCheckService, verify skip behavior
+
+4. Timeout recovery (integration)
+   - Add recoverTimedOutMessages method to RunDispatchService
+   - Call at start of runMessagesCycle
+   - Modify WebhookDispatchService.dispatchMessage to set timestamp
+   - Test: seed stuck messages, verify recovery
+
+5. Configuration (cross-cutting)
+   - Add env vars to .env.example
+   - Document defaults in README
+   - No code changes needed (ConfigService already handles missing vars)
 ```
 
-Build in this order: each component can be implemented and tested before the ones that depend on it exist. The scheduler is wired last because it is the trigger layer — everything it calls must be complete first.
+**Critical path:** MessageCheckService must exist before message-run dependency can be integrated. Timeout recovery requires timestamp field on messages, so dispatchMessage modification is a prerequisite.
+
+**Suggested implementation order:**
+1. **Phase 1:** Rate limiting (simplest, no new services)
+2. **Phase 2:** MessageCheckService + message-run dependency
+3. **Phase 3:** Timeout recovery (requires schema field)
+
+## Scalability Considerations
+
+| Concern | At 10 DBs | At 100 DBs | Mitigation |
+|---------|-----------|------------|------------|
+| **Rate limit per cycle** | 10 DBs × 10 runs = 100 dispatches/cycle max | 100 DBs × 10 runs = 1000 dispatches/cycle max | Acceptable — limit prevents unbounded growth |
+| **Message dependency queries** | 10 queries per run (up to 100 total) | 100 queries per run (up to 1000 total) | Queries are indexed and fast (~5ms); total cycle time still <10s |
+| **Timeout recovery overhead** | 10 updateMany operations per cycle | 100 updateMany operations per cycle | updateMany is efficient (single round-trip); no loops |
+
+**Bottleneck analysis:**
+- **First bottleneck:** Message dependency queries add latency proportional to (databases × rate_limit_runs). With 100 DBs and 10 runs each, that's up to 1000 queries per cycle. At 5ms per query, worst case is 5s of serial query time.
+- **Fix:** Already mitigated by rate limit — without rate limit, a database with 1000 eligible runs would execute 1000 dependency queries. Rate limit caps this at 10.
+
+**Optimization opportunities (defer until proven necessary):**
+1. Batch message checks: query once per database with `$or` array of (botIdentifier, chatDataId) pairs
+2. Cache message state per cycle: single query at start of processDatabaseRuns returns all "processing" messages for that DB
+
+**Do NOT prematurely optimize:** Current design is simple, testable, and performs adequately for stated scale (dozens of databases).
+
+## Anti-Patterns to Avoid
+
+### Anti-Pattern 1: Global Rate Limit Across All Databases
+
+**What:** Single shared counter for all databases, e.g., "stop after 100 dispatches total across all DBs".
+
+**Why wrong:** A database with 100 eligible runs would consume the entire global limit, starving all other databases. Defeats the purpose of parallel processing.
+
+**Do this instead:** Per-database limits with local counters (as designed above).
+
+### Anti-Pattern 2: Message Dependency Check at Cycle Start
+
+**What:** Query all messages for all databases at the start of runRunsCycle, build a Set of blocked (botIdentifier, chatDataId) pairs, consult Set before each dispatch.
+
+**Why wrong:** Message status changes during the cycle (external processors mark them "done"). A message that was "processing" at cycle start might be "done" by the time its run is evaluated. Stale data causes unnecessary blocking.
+
+**Do this instead:** Query messages immediately before dispatching each run (as designed above).
+
+### Anti-Pattern 3: Timeout Recovery as Separate Interval
+
+**What:** Add a 4th independent setInterval specifically for timeout recovery.
+
+**Why wrong:** Adds unnecessary complexity (another interval to configure, another isRunning guard). Timeout recovery is cheap (one updateMany per DB) and logically part of the messages cycle.
+
+**Do this instead:** Run timeout recovery at the start of each runMessagesCycle (as designed above).
+
+### Anti-Pattern 4: Rate Limiting via MongoDB Query Limit
+
+**What:** Use `.limit(10)` in the MongoDB find query instead of loop counter.
+
+**Why wrong:** Query limit would prevent seeing runs beyond the first 10, but there's no guarantee those 10 will all pass the message dependency check. If 3 of the first 10 are blocked by messages, only 7 get dispatched, not 10. The rate limit is then non-deterministic.
+
+**Do this instead:** Query all eligible runs (no limit), apply rate limit + dependency checks in the dispatch loop (as designed above).
+
+## Verification Strategy
+
+### Rate Limiting Verification
+
+**Setup:** Seed database with 50 eligible runs, set `RATE_LIMIT_RUNS=10`.
+
+**Expected behavior:**
+- Cycle 1: Dispatches 10 runs, leaves 40 as "waiting"
+- Cycle 2: Dispatches 10 more, leaves 30 as "waiting"
+- ...
+- Cycle 5: Dispatches final 10, all runs now "queued"
+
+**Log verification:** Look for "Rate limit reached: 10/10 runs dispatched" in logs.
+
+### Message-Run Dependency Verification
+
+**Setup:** Seed run with botIdentifier="bot1", chatDataId="chat1". Seed message with same identifiers, messageStatus="processing".
+
+**Expected behavior:**
+- Run query returns the run (eligible by time)
+- Message dependency check returns true (blocking message exists)
+- Run is NOT dispatched, remains "waiting"
+- Log shows "Run [id] blocked by pending messages"
+
+**After message completes:** Set message to "done", next cycle dispatches the run.
+
+### Timeout Recovery Verification
+
+**Setup:** Seed message with messageStatus="processing", processingStartedAt=(now - 15 minutes).
+
+**Expected behavior:**
+- Messages cycle starts
+- Timeout recovery executes updateMany
+- Message status changes to "pending", processingStartedAt unset
+- Log shows "Recovered 1 timed-out messages"
+- Message is now eligible for dispatch in same cycle
+
+## Migration Path
+
+### Deployment Strategy
+
+**Zero-downtime safe:** Yes — all features are opt-in via behavior (rate limits default high, message dependency skips runs safely, timeout recovery is idempotent).
+
+**Rollback safe:** Yes — remove env vars, redeploy. No database schema changes required (processingStartedAt is additive, ignored if absent).
+
+**Steps:**
+1. Deploy code with rate limiting disabled (set limits very high or omit env vars)
+2. Verify existing behavior unchanged (monitor logs)
+3. Enable rate limiting (set `RATE_LIMIT_*` env vars)
+4. Enable message-run dependency (already active, controlled by message data)
+5. Enable timeout recovery (already active if messages have timestamp field)
+
+**Gradual rollout:** Use `TARGET_DATABASES` to test on a single database first, then expand to all.
+
+## Open Questions
+
+**Q: Should rate limits be configurable per database, not just per dispatch type?**
+
+**A:** Out of scope for v1.5. Per-database configuration would require storing limits in the `vars` collection, adding complexity. Global per-type limits are sufficient for stated requirements ("10 webhooks per type per cycle").
+
+**Q: What happens if a message is stuck in "processing" but processingStartedAt is missing?**
+
+**A:** Timeout recovery query won't match it (query requires field to exist). This is acceptable — the field is set by new code, so only new messages have it. Old stuck messages remain stuck until manually fixed. Document this limitation.
+
+**Q: Should message dependency check also consider "pending" messages, not just "processing"?**
+
+**A:** No. "pending" messages haven't been dispatched yet — they don't block runs. Only "processing" messages (actively being handled by external service) are blockers. If we blocked on "pending", runs would never dispatch until all messages are done, defeating the purpose of concurrent dispatch.
 
 ## Sources
 
-- NestJS official documentation: Task Scheduling (`@nestjs/schedule`) — patterns confirmed from training data (HIGH confidence for NestJS 11 patterns)
-- MongoDB Node.js Driver documentation: multi-database access via single `MongoClient`, `listDatabases` command — well-established pattern (HIGH confidence)
-- Project requirements: `/root/time-trigger-api/.planning/PROJECT.md` — all component responsibilities and data flows derived directly from stated requirements
+- Existing codebase analysis: `/root/time-trigger-api/src/dispatch/run-dispatch.service.ts`, `/root/time-trigger-api/src/dispatch/webhook-dispatch.service.ts`, `/root/time-trigger-api/src/scheduler/scheduler.service.ts`
+- Project requirements: `/root/time-trigger-api/.planning/PROJECT.md` (v1.5 milestone requirements)
+- MongoDB native driver patterns: standard updateMany, countDocuments, indexed queries (HIGH confidence — well-established patterns)
+- NestJS dependency injection: service-per-concern pattern (HIGH confidence — framework idiom)
 
 ---
-*Architecture research for: cron-based multi-database webhook dispatch service*
-*Researched: 2026-03-25*
+*Architecture research for: Rate Limiting and Message-Run Dependency integration*
+*Researched: 2026-03-29*
+*Confidence: HIGH — all patterns are standard NestJS/MongoDB practices; no speculative techniques*

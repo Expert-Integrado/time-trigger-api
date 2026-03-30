@@ -1,183 +1,353 @@
-# Feature Research
+# Feature Landscape: Rate Limiting and Message-Run Dependency
 
-**Domain:** Cron-based webhook dispatch API (headless background service)
-**Researched:** 2026-03-25
-**Confidence:** HIGH — requirements are fully specified in PROJECT.md; domain patterns are well-established
+**Domain:** Cron-based webhook dispatcher with multi-database monitoring
+**Milestone:** v1.5 Rate Limiting and Message-Run Dependency
+**Researched:** 2026-03-29
+**Confidence:** MEDIUM-HIGH (based on codebase analysis + domain patterns from training data)
 
-## Feature Landscape
+## Context
 
-### Table Stakes (Users Expect These)
+This research focuses on NEW features for an existing Time Trigger API (v1.4) that already handles:
+- Multi-database MongoDB monitoring with automatic discovery
+- 3 independent dispatch types (runs, FUP, messages) with separate intervals
+- Per-client time controls (timeTrigger gates for runs/FUP only)
+- Atomic dispatch prevention via findOneAndUpdate
+- Single retry on failure with 60s delay
+- 746 LOC serving dozens of client databases
 
-Features the system must have to function at all. Missing any of these means the system fails its core purpose.
+The NEW features being added in v1.5:
+1. **Rate limiting:** Prevent overwhelming webhook endpoints by limiting dispatches per cycle per database
+2. **Message-run dependency:** Prevent runs from dispatching when related messages are still processing
+3. **Auto-timeout recovery:** Unstick messages that have been in "processing" state too long
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| Cron-based polling loop | The entire trigger model depends on periodic evaluation; without it nothing fires | LOW | NestJS `@nestjs/schedule` or native `setInterval`; interval driven by `CRON_INTERVAL` env var |
-| MongoDB connection + multi-DB enumeration | Data lives in MongoDB; must discover all client DBs dynamically | MEDIUM | Native driver required; must list all databases and filter by collection presence (`runs`, `webhooks`, `vars`) |
-| Run eligibility detection | Core query: `runStatus: "waiting"` AND `waitUntil <= now()` | LOW | Standard MongoDB query; must be indexed on `runStatus` + `waitUntil` for performance across dozens of DBs |
-| Time-of-day gating | Per-client `morningLimit` / `nightLimit` from `vars` collection; skip runs outside window | LOW | Read `vars` fresh every cycle (can change externally); compare current UTC/local hour against bounds |
-| Webhook dispatch (HTTP POST) | Sends run document to "Processador de Runs" endpoint | LOW | Standard `fetch` or `axios`; POST full run document as JSON body |
-| Status transition on success | `runStatus: "waiting"` → `"queued"`, set `queuedAt` timestamp | LOW | Single atomic update after confirmed webhook success; prevents re-dispatch |
-| Single-retry on failure | Retry once after 1 minute; leave as `"waiting"` if retry also fails | MEDIUM | Requires delayed retry without blocking main cycle; use `setTimeout` or NestJS scheduler |
-| Config re-read every cycle | `vars` and `webhooks` re-read each execution; external systems may change them at any time | LOW | No caching of config; always fetch fresh from MongoDB before processing |
-| Database filtering by collection presence | Skip DBs missing `runs`, `webhooks`, or `vars` collections | LOW | List collections per DB and check for required set; avoids errors on partial-setup DBs |
-| Environment variable configuration | `MONGODB_URI`, `CRON_INTERVAL` — all runtime config via env | LOW | Fail fast at startup if required env vars are missing |
-| Duplicate dispatch prevention | Once `runStatus: "queued"`, run must never be dispatched again | MEDIUM | Query filter naturally excludes queued runs; status update must be atomic (no race between find and update) |
-| Docker container operation | Must run as a headless Docker container | LOW | Dockerfile + `.env` injection; no interactive runtime dependencies |
-| Startup env validation | Fail loudly at boot if `MONGODB_URI` is missing rather than crashing mid-cycle | LOW | Validate required env vars before NestJS bootstrap completes |
-| Structured logging | Observability into which DBs were processed, which runs were dispatched, failures | LOW | NestJS Logger or Pino; log cycle start/end, per-DB counts, errors; critical for a headless service |
+## Table Stakes
 
-### Differentiators (Competitive Advantage)
+Features users expect in these domains. Missing = system feels incomplete or broken.
 
-Features that go beyond the minimum and deliver meaningful operational value.
+| Feature | Why Expected | Complexity | Notes | Dependencies |
+|---------|--------------|------------|-------|--------------|
+| **Per-database rate limit** | Prevents webhook endpoint overload; essential for production stability | Low | Configurable limit (e.g., 10 per cycle) prevents flooding downstream services | None - standalone feature |
+| **Global fallback limit** | Safety net when per-database config missing | Low | Single env var applies to all databases without explicit config | Depends on per-database rate limit |
+| **Limit per dispatch type** | Runs, FUP, and messages have different priorities and load characteristics | Medium | Each dispatch type needs independent counter; prevents fast messages from consuming runs quota | Depends on per-database rate limit |
+| **Soft limit (log + continue)** | Hard stop breaks system reliability; soft limit maintains uptime while alerting | Low | Log warning when limit hit, skip remaining items, continue next cycle | Depends on rate limiting implementation |
+| **Run-message dependency check** | Prevents race conditions where run dispatches while related message still processing | Medium | Query messages collection for "processing" status matching botIdentifier + chatDataId | Requires message status tracking (already exists) |
+| **Timeout recovery for stuck messages** | Messages stuck in "processing" forever block runs indefinitely; auto-recovery prevents manual intervention | Medium | Background job or pre-dispatch check: if `messageStatus="processing"` AND `processingStartedAt` > threshold, reset to "pending" | Requires tracking `processingStartedAt` timestamp |
+| **Configurable timeout threshold** | Different deployments have different processing time expectations | Low | Env var for timeout (default: 10 minutes) | Depends on timeout recovery |
+| **Atomic timestamp on status change** | Prevents race conditions in timeout detection | Low | Set `processingStartedAt` in same findOneAndUpdate that changes status to "processing" | Modifies existing dispatchMessage logic |
+| **Per-cycle reset of rate counters** | Each cycle starts fresh; limits apply within cycle, not across cycles | Low | Counters live in memory, reset at cycle start | Depends on rate limiting implementation |
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Per-DB concurrency (parallel processing) | Process all client databases concurrently instead of serially; avoids one slow DB blocking others | MEDIUM | `Promise.allSettled()` over all eligible DBs; critical once you have dozens of DBs; individual DB errors must not abort the cycle |
-| Graceful shutdown handling | SIGTERM/SIGINT causes the current cycle to complete before exit; prevents mid-cycle partial dispatches | LOW | NestJS lifecycle hooks (`onApplicationShutdown`); set a "shutting down" flag checked before each cycle |
-| Health check endpoint | `GET /health` returns 200 with last-cycle stats; enables Docker HEALTHCHECK and monitoring integration | LOW | Minimal NestJS controller; expose last run time, DB count, errors — already have Express via NestJS |
-| Idempotent status update (atomic find-and-update) | Use `findOneAndUpdate` with `{runStatus: "waiting"}` filter in the update query itself, not a separate find then update | LOW | Prevents race conditions if multiple instances ever run; a run can only transition if it is still `"waiting"` at update time |
-| FUP time-window support | `vars` already contains `morningLimitFUP` / `nightLimitFUP` in some DBs; supporting a second time window for follow-up runs adds no new infrastructure | LOW | Only relevant for future run types; extend time-gate logic to check secondary window when present |
-| Cycle metrics / summary log | Log a single summary line per cycle: DBs scanned, runs dispatched, runs skipped, errors — high signal-to-noise ratio | LOW | Accumulate counters during cycle, log at end; zero overhead |
-| Configurable retry delay | `RETRY_DELAY_MS` env var (default 60000); allows tuning without code change | LOW | Simple env var; low complexity, high operational value |
+## Differentiators
 
-### Anti-Features (Commonly Requested, Often Problematic)
+Features that set the implementation apart. Not expected, but valuable.
 
-Features to explicitly NOT build for this system.
+| Feature | Value Proposition | Complexity | Notes | Dependencies |
+|---------|-------------------|------------|-------|--------------|
+| **Rate limit metrics in logs** | Visibility into dispatch patterns; helps tune limits | Low | Log "dispatched X/Y limit" at cycle end per database | Depends on rate limiting |
+| **Skip vs queue behavior** | Skipped items retry next cycle (existing pattern); no new queue complexity | Low | Aligns with existing "leave as waiting/pending" pattern | None - architectural alignment |
+| **Dependency chain visibility** | Log when run skipped due to pending messages; aids debugging | Low | "Run {id} skipped — {N} pending messages for botIdentifier + chatDataId" | Depends on run-message dependency |
+| **Graceful degradation on query errors** | If dependency check query fails, dispatch anyway (fail open) vs block forever (fail closed) | Medium | Trade-off: availability vs consistency. Recommendation: fail open with loud warning | Depends on run-message dependency |
+| **Timeout recovery dry-run mode** | Preview what would be reset without actually resetting | Medium | Env var `TIMEOUT_RECOVERY_DRY_RUN=true` logs candidates without updating | Depends on timeout recovery |
+| **Per-database timeout overrides** | Some clients process faster/slower than others | High | Read timeout from vars collection; falls back to env var default | Depends on timeout recovery + vars schema extension |
 
-| Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|-----------------|-------------|
-| Web UI / dashboard | Visibility into what's running, which runs are queued | This is a headless background service; a UI is a separate product concern and adds deploy complexity | Export structured logs to an external log aggregator (e.g., Datadog, Grafana Loki) where dashboards already exist |
-| REST API for run management (create/edit/delete runs) | "Manage everything in one place" appeal | Runs are written by other systems; this service is read-and-dispatch only; adding write APIs blurs ownership and creates coupling | Other systems own the `runs` collection; they write directly to MongoDB |
-| Persistent retry queue (Redis/Bull) | "More reliable retries" | The existing retry model (leave as `"waiting"` → picked up next cycle) IS the persistent queue; MongoDB `runs` collection serves this role; adding Redis is unnecessary complexity | The single in-process retry handles transient failures; subsequent cycles handle persistent failures naturally |
-| Webhook response processing | "Act on webhook response data" | Out of scope per PROJECT.md; the downstream system owns what happens after the run is received | Downstream webhook handler owns its own response logic |
-| Authentication / public endpoints | "Secure the API" | This is an internal service with no public endpoints; adding auth creates operational overhead for zero security gain | Run inside private network / Docker network; no public surface exposed |
-| Per-run retry configuration | "Fine-grained retry policies per run type" | Premature complexity; single retry policy handles 95% of real failures (transient network, downstream restart) | Re-evaluate if retry failure patterns emerge after deployment |
-| Caching of `vars` / `webhooks` | "Reduce MongoDB reads" | Caching breaks the requirement to always use the latest config; a single collection read per cycle is negligible | Read fresh every cycle as specified |
-| Multiple scheduler instances / distributed locking | "High availability" | For this use case (dozens of DBs, lightweight dispatch), a single reliable instance with Docker restart policy is sufficient; distributed locking adds Zookeeper/Redis dependency | Docker `restart: always`; if true HA is needed, revisit with evidence |
+## Anti-Features
+
+Features to explicitly NOT build.
+
+| Anti-Feature | Why Avoid | What to Do Instead |
+|--------------|-----------|-------------------|
+| **Per-document rate limiting** | Over-engineered; cycle-level limiting is sufficient; adds O(N) memory overhead | Use per-database, per-dispatch-type limit — simpler, sufficient |
+| **Priority queues for rate-limited items** | Adds complexity (queue storage, ordering, persistence); conflicts with "next cycle picks up" pattern | Keep existing pattern: skipped items stay "waiting"/"pending", next cycle processes FIFO |
+| **Distributed rate limiting (cross-instance)** | No requirement for multi-instance deployment; premature optimization | Single-instance rate limiting in memory |
+| **Adaptive/dynamic rate limits** | Auto-adjusting based on webhook response time — too complex, too opaque | Static configurable limits; operators adjust based on monitoring |
+| **Retry escalation for stuck messages** | If message stuck, try harder (more retries, different endpoints) — scope creep | Timeout recovery resets to "pending"; existing retry logic handles it |
+| **Message priority/ordering guarantees** | "Process message A before message B" — not in requirements, adds database indexes and sorting complexity | Process messages FIFO as found; dependency check only blocks runs, not message order |
+| **Webhook endpoint health checking** | Proactively disable dispatch to failing endpoints — different concern, belongs in separate monitoring system | Rely on existing POST success/failure + retry logic |
+| **Rate limit by time window (e.g., per minute)** | Adds timestamp tracking and sliding window logic | Per-cycle limit is simpler and sufficient given fixed cycle intervals |
 
 ## Feature Dependencies
 
 ```
-[MongoDB Connection]
-    └──requires──> [Multi-DB Enumeration]
-                       └──requires──> [Database Filtering by Collection Presence]
-                                          └──requires──> [Run Eligibility Detection]
-                                                             └──requires──> [Time-of-Day Gating]
-                                                                                └──requires──> [Webhook Dispatch]
-                                                                                                   └──requires──> [Status Transition on Success]
-                                                                                                   └──requires──> [Single-Retry on Failure]
+Rate Limiting Foundation
+  ├─> Per-database rate limit (per dispatch type)
+  ├─> Global fallback limit
+  ├─> Soft limit (log + continue)
+  └─> Per-cycle reset
 
-[Cron Polling Loop]
-    └──drives──> [MongoDB Connection]
-    └──drives──> [Config Re-Read Every Cycle]
+Message-Run Dependency Foundation
+  ├─> Atomic timestamp on status change (processingStartedAt)
+  ├─> Run-message dependency check (botIdentifier + chatDataId)
+  └─> Dependency chain visibility (logs)
 
-[Status Transition on Success]
-    └──depends-on──> [Duplicate Dispatch Prevention (atomic update)]
-
-[Startup Env Validation]
-    └──gates──> [Cron Polling Loop] (must pass before loop starts)
-
-[Per-DB Concurrency]
-    └──enhances──> [Multi-DB Enumeration] (parallelizes it)
-    └──requires──> [Error isolation per DB] (one DB failure must not abort others)
-
-[Health Check Endpoint]
-    └──enhances──> [Structured Logging] (exposes same data via HTTP)
-
-[FUP Time-Window Support]
-    └──extends──> [Time-of-Day Gating]
+Timeout Recovery Foundation
+  ├─> Atomic timestamp on status change (processingStartedAt) [SHARED with dependency]
+  ├─> Timeout recovery query (messageStatus="processing" AND age > threshold)
+  ├─> Configurable timeout threshold
+  └─> Reset to "pending" with log
 ```
 
-### Dependency Notes
+**Critical path:** Atomic timestamp MUST be implemented first — both dependency checking and timeout recovery depend on it.
 
-- **Run Eligibility Detection requires MongoDB Connection:** The query `{runStatus: "waiting", waitUntil: {$lte: now}}` executes against the `runs` collection of each discovered DB.
-- **Status Transition requires Duplicate Dispatch Prevention:** The `findOneAndUpdate` pattern that gates the update on `{runStatus: "waiting"}` must be established before dispatch logic ships, not retrofitted.
-- **Config Re-Read Every Cycle is a design constraint, not a feature:** It must be baked into the polling loop architecture from day one; caching cannot be introduced later without a policy review.
-- **Per-DB Concurrency conflicts with serial error assumptions:** If parallelizing, per-DB error handling must be explicit (`Promise.allSettled`, not `Promise.all`) — a failing DB must never halt other DBs.
+## Expected Behavior Patterns
 
-## MVP Definition
+### Rate Limiting
 
-### Launch With (v1)
+**Standard pattern (from cron job / batch processing domains):**
 
-Minimum viable product — what's needed for the service to fulfill its core purpose reliably.
+1. **Counter per scope:** Each database + dispatch type gets independent counter
+2. **Check before dispatch:** Before processing item, check if counter < limit
+3. **Increment on success:** Only successful dispatches count toward limit
+4. **Soft limit:** When limit hit, log + skip remaining, don't fail entire cycle
+5. **Reset per cycle:** Counter resets at start of next cycle
 
-- [ ] Cron polling loop driven by `CRON_INTERVAL` env var — without this, nothing triggers
-- [ ] MongoDB multi-DB discovery with collection-presence filtering — discovers all eligible client DBs
-- [ ] Run eligibility query: `runStatus: "waiting"` AND `waitUntil <= now()` — identifies what to dispatch
-- [ ] Time-of-day gate using `morningLimit` / `nightLimit` from `vars` — per-client scheduling window
-- [ ] Webhook POST to "Processador de Runs" URL from `webhooks` collection — core dispatch action
-- [ ] Atomic status transition: `waiting` → `queued` + `queuedAt` timestamp — prevents re-dispatch
-- [ ] Single retry after 1 minute on failure, leave as `waiting` if retry fails — handles transient errors
-- [ ] Config re-read every cycle (no caching of `vars`/`webhooks`) — respects external config changes
-- [ ] Startup env validation for `MONGODB_URI` — fails fast rather than crashing mid-cycle
-- [ ] Structured logging per cycle — minimum operational observability for a headless service
-- [ ] Docker container with env-based config — delivery target
+**Example flow:**
+```
+Cycle starts for db="sdr-4blue"
+  runsCounter = 0, fupCounter = 0, messagesCounter = 0
+  RATE_LIMIT_RUNS = 10 (from env or default)
 
-### Add After Validation (v1.x)
+  Process runs:
+    - Run #1: dispatch success → runsCounter = 1
+    - Run #2: dispatch success → runsCounter = 2
+    ...
+    - Run #10: dispatch success → runsCounter = 10
+    - Run #11: runsCounter >= limit → SKIP (log: "Rate limit reached for runs in sdr-4blue")
+    - Remaining runs skipped, stay "waiting"
 
-Features to add once core dispatch loop is proven stable.
+  Process FUP:
+    - fupCounter starts at 0 (independent)
+    - FUP #1: dispatch success → fupCounter = 1
+    ...
+```
 
-- [ ] Per-DB concurrent processing (`Promise.allSettled`) — add when timing data shows serial processing creates lag across DB count
-- [ ] Graceful shutdown handling — add when first unexpected mid-cycle termination is observed in production
-- [ ] Health check endpoint (`GET /health`) — add when Docker HEALTHCHECK or external monitoring is configured
-- [ ] Cycle summary metrics log — add immediately if log volume from per-run logging becomes noisy
+**Configuration:**
+- `RATE_LIMIT_RUNS=10` (env var, default)
+- `RATE_LIMIT_FUP=5` (env var, default)
+- `RATE_LIMIT_MESSAGES=20` (env var, default)
+- Per-database overrides in vars collection (differentiator, not table stakes)
 
-### Future Consideration (v2+)
+### Message-Run Dependency
 
-Features to defer until post-deployment evidence warrants them.
+**Standard pattern (from task orchestration / workflow domains):**
 
-- [ ] FUP time-window support (`morningLimitFUP` / `nightLimitFUP`) — defer until a client DB actually requires it and the run type is defined
-- [ ] Configurable retry delay via env var — defer until the 1-minute default proves wrong in production
-- [ ] Idempotent multi-instance dispatch — defer unless a second instance is ever deployed; current single-instance model with `restart: always` is sufficient
+1. **Identify related messages:** Query messages collection for documents matching:
+   - `messageStatus: "processing"`
+   - `botIdentifier: <run.botIdentifier>`
+   - `chatDataId: <run.chatDataId>`
+2. **Block if any found:** If count > 0, skip run, log dependency, leave run as "waiting"
+3. **Dispatch if clear:** If count = 0, proceed with normal dispatch logic
 
-## Feature Prioritization Matrix
+**Example flow:**
+```
+Run ready: { _id: "run-123", botIdentifier: "sdr4blue", chatDataId: "chat-456", runStatus: "waiting" }
 
-| Feature | User Value | Implementation Cost | Priority |
-|---------|------------|---------------------|----------|
-| Cron polling loop | HIGH | LOW | P1 |
-| MongoDB multi-DB enumeration + filtering | HIGH | MEDIUM | P1 |
-| Run eligibility detection | HIGH | LOW | P1 |
-| Time-of-day gating | HIGH | LOW | P1 |
-| Webhook dispatch (HTTP POST) | HIGH | LOW | P1 |
-| Atomic status transition (waiting → queued) | HIGH | LOW | P1 |
-| Duplicate dispatch prevention | HIGH | LOW | P1 |
-| Single-retry on failure | HIGH | MEDIUM | P1 |
-| Config re-read every cycle | HIGH | LOW | P1 |
-| Startup env validation | MEDIUM | LOW | P1 |
-| Structured logging | HIGH | LOW | P1 |
-| Docker deployment | HIGH | LOW | P1 |
-| Per-DB concurrent processing | MEDIUM | LOW | P2 |
-| Graceful shutdown | MEDIUM | LOW | P2 |
-| Health check endpoint | MEDIUM | LOW | P2 |
-| Cycle summary log | MEDIUM | LOW | P2 |
-| FUP time-window support | LOW | LOW | P3 |
-| Configurable retry delay | LOW | LOW | P3 |
+Dependency check:
+  messages.find({
+    messageStatus: "processing",
+    botIdentifier: "sdr4blue",
+    chatDataId: "chat-456"
+  }).count()
+  → returns 2
 
-**Priority key:**
-- P1: Must have for launch — service cannot reliably fulfill its purpose without it
-- P2: Should have — operational quality, add early in v1.x
-- P3: Nice to have — defer until evidence demands it
+  Log: "Run run-123 skipped — 2 pending messages for sdr4blue/chat-456"
+  → Run stays "waiting", next cycle checks again
+```
 
-## Competitor Feature Analysis
+**Why this works:**
+- Messages change to "processing" on successful webhook POST (existing logic)
+- External system changes "processing" → "sent" when done (external to this API)
+- Dependency check prevents run from racing ahead of in-flight messages
 
-This is an internal headless dispatch service, not a commercial product competing in a market. The meaningful comparison is against alternative implementation approaches rather than competing products.
+**Edge case:** If message webhook fails retry and reverts to "pending", it won't block runs (only "processing" blocks). This is correct — failed message will retry next cycle, run can proceed.
 
-| Feature | DIY setInterval | NestJS @nestjs/schedule | Commercial (Inngest, Trigger.dev) | Our Approach |
-|---------|-----------------|------------------------|-----------------------------------|--------------|
-| Cron execution | Manual, no lifecycle management | Decorator-driven, lifecycle-aware | Managed, durable, at-least-once | NestJS schedule module — lifecycle management without external dependency |
-| Multi-tenant / multi-DB | Manual loop | Manual loop | Per-tenant queues | Manual `Promise.allSettled` loop per DB — fits the "discover from MongoDB" model |
-| Retry logic | Manual setTimeout | Manual setTimeout | Built-in with backoff | Single in-process setTimeout — matches project's explicitly simple retry spec |
-| Persistent job state | Must build | Must build | Built-in (Redis/DB backed) | MongoDB `runs` collection IS the persistent state — no separate job store needed |
-| Observability | None by default | NestJS Logger | Full dashboard | Structured logs via NestJS Logger — sufficient for internal service |
-| Deployment | Process + env | Docker-friendly | SaaS or self-hosted complexity | Docker container — fits stated constraints |
+### Auto-Timeout Recovery
+
+**Standard pattern (from distributed system / dead letter queue domains):**
+
+1. **Detect stuck items:** Query messages collection for:
+   - `messageStatus: "processing"`
+   - `processingStartedAt < (Date.now() - TIMEOUT_THRESHOLD_MS)`
+2. **Reset status:** Update found messages:
+   - `{ $set: { messageStatus: "pending" }, $unset: { processingStartedAt: "" } }`
+3. **Log recovery:** Emit structured log with message ID and how long it was stuck
+4. **Run on cycle start or dedicated interval:** Either runs before messages dispatch in each cycle, or on independent slower interval
+
+**Example flow:**
+```
+TIMEOUT_THRESHOLD_MS = 600000 (10 minutes)
+Current time: 1234567890000
+
+messages.find({
+  messageStatus: "processing",
+  processingStartedAt: { $lt: 1234567890000 - 600000 }
+})
+→ returns 1 document: { _id: "msg-789", processingStartedAt: 1234567200000 }
+
+messages.updateMany(
+  { _id: { $in: ["msg-789"] } },
+  { $set: { messageStatus: "pending" }, $unset: { processingStartedAt: "" } }
+)
+
+Log: "Timeout recovery reset msg-789 (stuck for 11.5 minutes)"
+```
+
+**When to run:**
+- **Option A:** Before messages dispatch in each messages cycle (fast interval, low overhead)
+- **Option B:** Independent slower interval (e.g., every 5 minutes) to reduce query load
+
+**Recommendation:** Option A — runs in messages cycle, before finding "pending" messages. Keeps recovery responsive without adding another interval.
+
+## MongoDB Schema Implications
+
+### Existing Schema (messages collection)
+```json
+{
+  "_id": ObjectId,
+  "messageStatus": "pending" | "processing" | "sent",
+  "botIdentifier": "sdr4blue",
+  "chatDataId": "chat-456",
+  ...
+}
+```
+
+### Required Addition
+```json
+{
+  "_id": ObjectId,
+  "messageStatus": "pending" | "processing" | "sent",
+  "processingStartedAt": Date | undefined,  // NEW: set when status → "processing"
+  "botIdentifier": "sdr4blue",
+  "chatDataId": "chat-456",
+  ...
+}
+```
+
+**Index requirements:**
+- Existing: None assumed (small databases, queries per cycle are fast enough)
+- Recommended for timeout recovery: `{ messageStatus: 1, processingStartedAt: 1 }` (compound index)
+- Recommended for dependency check: `{ messageStatus: 1, botIdentifier: 1, chatDataId: 1 }` (compound index)
+
+**Note:** Indexes are OPTIONAL for MVP — profile first. Dozens of databases × dozens of messages = low query cost. Add indexes only if cycle time degrades.
+
+### Existing Schema (runs collection)
+```json
+{
+  "_id": ObjectId,
+  "runStatus": "waiting" | "queued" | "done",
+  "waitUntil": Number (timestamp),
+  "botIdentifier": "sdr4blue",
+  "chatDataId": "chat-456",  // Assumed — verify in real data
+  ...
+}
+```
+
+**Assumption:** `chatDataId` exists on run documents. If not, dependency check cannot match. **Validation needed.**
+
+### Existing Schema (vars collection)
+```json
+{
+  "botIdentifier": "sdr4blue",
+  "timeTrigger": {
+    "enabled": true,
+    "morningLimit": 8,
+    "nightLimit": 20,
+    "allowedDays": [1, 2, 3, 4, 5]
+  }
+}
+```
+
+**Potential addition (differentiator, not MVP):**
+```json
+{
+  "botIdentifier": "sdr4blue",
+  "timeTrigger": { ... },
+  "rateLimits": {  // OPTIONAL per-database override
+    "runs": 10,
+    "fup": 5,
+    "messages": 20
+  },
+  "timeoutThresholdMs": 600000  // OPTIONAL per-database override
+}
+```
+
+## MVP Recommendation
+
+Prioritize (in order):
+
+### Phase 1: Atomic Timestamp (Foundation)
+**Why first:** Both dependency check and timeout recovery need it.
+1. Modify `dispatchMessage()` in WebhookDispatchService
+2. Change findOneAndUpdate to set `processingStartedAt: new Date()` alongside `messageStatus: "processing"`
+3. Test: Verify timestamp written on success, not written on failure/retry
+
+**Complexity:** Low
+**Risk:** Low — additive change, doesn't break existing behavior
+
+### Phase 2: Rate Limiting
+**Why second:** Independent feature, high value, low risk.
+1. Add env vars: `RATE_LIMIT_RUNS`, `RATE_LIMIT_FUP`, `RATE_LIMIT_MESSAGES` (defaults: 10, 5, 20)
+2. Add counters to `processDatabaseRuns/Fup/Messages()` methods
+3. Check counter before each dispatch, skip if >= limit, log when limit hit
+4. Test: Verify counter increments, limit enforced, remaining items skipped
+
+**Complexity:** Low
+**Risk:** Low — pure addition, no schema changes
+
+### Phase 3: Message-Run Dependency
+**Why third:** Depends on Phase 1 being stable; higher complexity.
+1. Before dispatching run, query messages for "processing" + matching botIdentifier + chatDataId
+2. If count > 0, skip run, log dependency
+3. Test: Verify run skipped when messages processing, dispatched when clear
+
+**Complexity:** Medium (additional query per run)
+**Risk:** Medium — could slow down runs cycle if query inefficient
+
+### Phase 4: Timeout Recovery
+**Why last:** Depends on Phase 1; can be MVP-ed as manual intervention if needed.
+1. Add env var: `MESSAGE_TIMEOUT_MS` (default: 600000 = 10 min)
+2. In `runMessagesCycle()`, before finding "pending" messages, run timeout recovery query
+3. Update stuck messages: `{ messageStatus: "pending" }, $unset: { processingStartedAt }`
+4. Log each recovered message
+5. Test: Verify stuck messages reset, logs emitted
+
+**Complexity:** Medium
+**Risk:** Low — runs before normal processing, worst case is no-op
+
+## Defer for Later
+
+1. **Per-database rate limit overrides** (vars collection) — operators can adjust global env vars for now
+2. **Per-database timeout overrides** — global timeout sufficient for MVP
+3. **Rate limit metrics in logs** — can add after validating base functionality
+4. **Timeout recovery dry-run mode** — debugging feature, add if needed
+
+## Open Questions for Validation
+
+1. **Do run documents have `chatDataId` field?** Assumption: yes. If not, dependency check impossible without schema change.
+2. **Do run documents have `botIdentifier` field?** Assumption: yes (seen in tests). Confirm in real data.
+3. **What's typical processing time for messages?** Determines if 10-minute timeout is reasonable. Too short = premature resets, too long = runs blocked unnecessarily.
+4. **What's typical count of eligible runs/FUP/messages per database per cycle?** Determines if rate limits of 10/5/20 are appropriate.
+5. **Are there existing indexes on messages collection?** Determines if dependency check / timeout recovery queries are fast enough.
 
 ## Sources
 
-- PROJECT.md — authoritative requirements source; all table-stakes features map directly to stated requirements
-- `.planning/codebase/CONCERNS.md` — identifies implementation gaps (no scheduling, no DB layer, no env validation) that inform complexity estimates
-- Domain knowledge: cron/webhook dispatch patterns (at-most-once vs at-least-once semantics, atomic state transitions, fan-out polling across multi-tenant data) — HIGH confidence based on established patterns
+**Confidence Level: MEDIUM-HIGH**
+
+Research based on:
+- **HIGH confidence:** Existing codebase analysis (run-dispatch.service.ts, webhook-dispatch.service.ts, messages dispatch implementation from v1.3)
+- **HIGH confidence:** MongoDB native driver patterns (findOneAndUpdate, atomic updates)
+- **MEDIUM confidence:** Rate limiting patterns (standard per-scope counter pattern from training data, aligned with cron job best practices)
+- **MEDIUM confidence:** Dependency checking patterns (standard task orchestration pattern from training data)
+- **MEDIUM confidence:** Timeout recovery patterns (dead letter queue / stuck job recovery from training data)
+
+**Limitations:**
+- Web search tools unavailable — relied on training data for pattern validation
+- No access to Context7 or official documentation for rate limiting libraries (not using library, implementing in-app)
+- Assumptions about `chatDataId` and `botIdentifier` fields on run documents need validation against real data
+
+**Validation needed:**
+- Confirm run document schema (chatDataId, botIdentifier fields)
+- Confirm typical processing times and eligible item counts (informs defaults)
+- Verify existing indexes on messages collection (performance)
 
 ---
-*Feature research for: Cron-based webhook dispatch API (Time Trigger API)*
-*Researched: 2026-03-25*
+*Feature research for v1.5: Rate Limiting and Message-Run Dependency*
+*Researched: 2026-03-29*
