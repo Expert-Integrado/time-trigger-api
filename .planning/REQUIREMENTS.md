@@ -7,13 +7,13 @@
 
 ### Rate Limiting (RATE-*)
 
-- [ ] **RATE-01**: Each database has its own independent webhook dispatch limit per cycle (not a global shared counter)
-- [ ] **RATE-02**: `RATE_LIMIT_RUNS` env var controls max runs dispatched per database per cycle (default: 10)
-- [ ] **RATE-03**: `RATE_LIMIT_FUP` env var controls max FUPs dispatched per database per cycle (default: 10)
-- [ ] **RATE-04**: `RATE_LIMIT_MESSAGES` env var controls max messages dispatched per database per cycle (default: 10)
-- [ ] **RATE-05**: Soft limit behavior — when limit is reached, logs and skips remaining items without failing the cycle
-- [ ] **RATE-06**: Rate limit counter increments only after a successful dispatch (findOneAndUpdate returned a document)
-- [ ] **RATE-07**: Counter resets at the start of each new cycle, independently per dispatch type
+- [x] **RATE-01**: Each database has its own independent webhook dispatch limit per cycle (not a global shared counter)
+- [x] **RATE-02**: `RATE_LIMIT_RUNS` env var controls max runs dispatched per database per cycle (default: 10)
+- [x] **RATE-03**: `RATE_LIMIT_FUP` env var controls max FUPs dispatched per database per cycle (default: 10)
+- [x] **RATE-04**: `RATE_LIMIT_MESSAGES` env var controls max messages dispatched per database per cycle (default: 10)
+- [x] **RATE-05**: Soft limit behavior — when limit is reached, logs and skips remaining items without failing the cycle
+- [x] **RATE-06**: Rate limit counter increments only after a successful dispatch (findOneAndUpdate returned a document)
+- [x] **RATE-07**: Counter resets at the start of each new cycle, independently per dispatch type
 
 ### Message-Run Dependency (DEP-*)
 

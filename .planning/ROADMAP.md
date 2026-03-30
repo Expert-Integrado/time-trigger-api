@@ -82,7 +82,7 @@
 **Plans**: 2 plans
 
 Plans:
-- [ ] 09-01-PLAN.md — Add per-database rate limit counters and env vars to `processDatabase*` methods in RunDispatchService
+- [x] 09-01-PLAN.md — Add per-database rate limit counters and env vars to `processDatabase*` methods in RunDispatchService
 - [ ] 09-02-PLAN.md — Add unit tests for rate limiting behavior (per-database isolation, counter reset, increment-on-success only)
 
 ### Phase 10: Message-Run Dependency
@@ -129,6 +129,6 @@ Phases 1-8 complete. Phases 9-11 planned for v1.5.
 | 6. FUP Dispatch | v1.2 | 1/1 | Complete | 2026-03-26 |
 | 7. Messages Dispatch | v1.3 | 1/1 | Complete | 2026-03-26 |
 | 8. Independent Cron Intervals | v1.4 | 3/3 | Complete | 2026-03-26 |
-| 9. Rate Limiting | v1.5 | 0/2 | Not started | - |
+| 9. Rate Limiting | v1.5 | 1/2 | In Progress|  |
 | 10. Message-Run Dependency | v1.5 | 0/2 | Not started | - |
 | 11. Timeout Recovery | v1.5 | 0/1 | Not started | - |
