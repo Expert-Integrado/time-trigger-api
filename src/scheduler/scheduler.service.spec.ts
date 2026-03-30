@@ -31,6 +31,7 @@ describe('SchedulerService', () => {
               if (key === 'CRON_INTERVAL_RUNS') return '30000';
               if (key === 'CRON_INTERVAL_FUP') return '15000';
               if (key === 'CRON_INTERVAL_MESSAGES') return '5000';
+              if (key === 'CRON_INTERVAL_RECOVERY') return '60000';
               throw new Error(`Unexpected env var: ${key}`);
             }),
           },
@@ -41,6 +42,7 @@ describe('SchedulerService', () => {
             runRunsCycle: jest.fn().mockResolvedValue(undefined),
             runFupCycle: jest.fn().mockResolvedValue(undefined),
             runMessagesCycle: jest.fn().mockResolvedValue(undefined),
+            runRecoveryCycle: jest.fn().mockResolvedValue(undefined),
           },
         },
       ],
@@ -127,6 +129,7 @@ describe('SchedulerService', () => {
     expect(delays).toContain(30000);
     expect(delays).toContain(15000);
     expect(delays).toContain(5000);
+    expect(delays).toContain(60000);
     setIntervalSpy.mockRestore();
   });
 
@@ -169,5 +172,34 @@ describe('SchedulerService', () => {
       (call) => call[0],
     );
     expect(registeredNames).not.toContain('dispatch-cycle');
+  });
+
+  it('(TOUT-03) reads CRON_INTERVAL_RECOVERY from ConfigService in onModuleInit', () => {
+    service.onModuleInit();
+    expect(configService.getOrThrow).toHaveBeenCalledWith(
+      'CRON_INTERVAL_RECOVERY',
+    );
+  });
+
+  it('(TOUT-03) registers recover-messages interval with SchedulerRegistry', () => {
+    service.onModuleInit();
+    expect(schedulerRegistry.addInterval).toHaveBeenCalledWith(
+      'recover-messages',
+      expect.anything(),
+    );
+  });
+
+  it('recover-messages interval fires runRecoveryCycle()', () => {
+    service.onModuleInit();
+    jest.advanceTimersByTime(60000);
+    expect(runDispatchService.runRecoveryCycle).toHaveBeenCalled();
+  });
+
+  it('onModuleDestroy deletes recover-messages', () => {
+    service.onModuleInit();
+    service.onModuleDestroy();
+    expect(schedulerRegistry.deleteInterval).toHaveBeenCalledWith(
+      'recover-messages',
+    );
   });
 });
