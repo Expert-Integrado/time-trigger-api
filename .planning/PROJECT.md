@@ -73,7 +73,6 @@ Per-database rate limiting is now implemented for all three dispatch types. Each
 ### Active
 
 - [ ] Message-run dependency based on botIdentifier + chatDataId
-- [ ] Message-run dependency based on botIdentifier + chatDataId
 - [ ] Automatic timeout recovery for stuck messages (>10 min in "processing")
 
 ### Out of Scope
@@ -103,6 +102,7 @@ Per-database rate limiting is now implemented for all three dispatch types. Each
 - v1.2 FUP Dispatch: FUP collection processing (Phase 6, 1 plan, shipped 2026-03-26)
 - v1.3 Messages Dispatch: Messages collection processing (Phase 7, 1 plan, shipped 2026-03-26)
 - v1.4 Independent Cron Intervals: 3 independent setIntervals (Phase 8, 3 plans, shipped 2026-03-29)
+- v1.5 Phase 9 Rate Limiting: per-database dispatch caps, boolean returns, 129 tests (Phase 9, 2 plans, shipped 2026-03-30)
 
 ## Constraints
 
