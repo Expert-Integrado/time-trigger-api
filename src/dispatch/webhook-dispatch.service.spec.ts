@@ -138,6 +138,33 @@ describe('WebhookDispatchService', () => {
     ).resolves.not.toThrow();
     expect(setTimeout).toHaveBeenCalledWith(expect.any(Function), 60_000);
   });
+
+  it('returns true when findOneAndUpdate claims the run (Promise<boolean>)', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true });
+    // mockCollection.findOneAndUpdate already returns run (truthy) by default
+
+    const result = await service.dispatch(mockDb as unknown as Db, run, webhookUrl);
+
+    expect(result).toBe(true);
+  });
+
+  it('returns false when findOneAndUpdate returns null (already claimed)', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true });
+    mockCollection.findOneAndUpdate.mockResolvedValueOnce(null);
+
+    const result = await service.dispatch(mockDb as unknown as Db, run, webhookUrl);
+
+    expect(result).toBe(false);
+  });
+
+  it('returns false when HTTP post fails (retry path)', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: false });
+
+    const result = await service.dispatch(mockDb as unknown as Db, run, webhookUrl);
+
+    expect(result).toBe(false);
+    expect(setTimeout).toHaveBeenCalledWith(expect.any(Function), 60_000);
+  });
 });
 
 describe('WebhookDispatchService - dispatchFup', () => {
@@ -271,6 +298,24 @@ describe('WebhookDispatchService - dispatchFup', () => {
       service.dispatchFup(mockFupDb as unknown as Db, fup, fupWebhookUrl),
     ).resolves.not.toThrow();
     expect(setTimeout).toHaveBeenCalledWith(expect.any(Function), 60_000);
+  });
+
+  it('returns true when findOneAndUpdate claims the FUP (Promise<boolean>)', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true });
+    // mockFupCollection.findOneAndUpdate already returns fup (truthy) by default
+
+    const result = await service.dispatchFup(mockFupDb as unknown as Db, fup, fupWebhookUrl);
+
+    expect(result).toBe(true);
+  });
+
+  it('returns false when FUP already claimed (findOneAndUpdate returns null)', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true });
+    mockFupCollection.findOneAndUpdate.mockResolvedValueOnce(null);
+
+    const result = await service.dispatchFup(mockFupDb as unknown as Db, fup, fupWebhookUrl);
+
+    expect(result).toBe(false);
   });
 });
 
@@ -444,5 +489,31 @@ describe('WebhookDispatchService - dispatchMessage', () => {
       ),
     ).resolves.not.toThrow();
     expect(setTimeout).toHaveBeenCalledWith(expect.any(Function), 60_000);
+  });
+
+  it('returns true when findOneAndUpdate claims the message (Promise<boolean>)', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true });
+    // mockMsgCollection.findOneAndUpdate already returns message (truthy) by default
+
+    const result = await service.dispatchMessage(
+      mockMsgDb as unknown as Db,
+      message,
+      messagesWebhookUrl,
+    );
+
+    expect(result).toBe(true);
+  });
+
+  it('returns false when message already claimed (findOneAndUpdate returns null)', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true });
+    mockMsgCollection.findOneAndUpdate.mockResolvedValueOnce(null);
+
+    const result = await service.dispatchMessage(
+      mockMsgDb as unknown as Db,
+      message,
+      messagesWebhookUrl,
+    );
+
+    expect(result).toBe(false);
   });
 });
