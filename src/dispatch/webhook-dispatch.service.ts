@@ -98,7 +98,7 @@ export class WebhookDispatchService {
         .collection('messages')
         .findOneAndUpdate(
           { _id: messageId, messageStatus: 'pending' },
-          { $set: { messageStatus: 'processing' } },
+          { $set: { messageStatus: 'processing', processingStartedAt: new Date() } },
         );
       if (!result) {
         this.logger.warn(
@@ -117,7 +117,7 @@ export class WebhookDispatchService {
             .collection('messages')
             .findOneAndUpdate(
               { _id: messageId, messageStatus: 'pending' },
-              { $set: { messageStatus: 'processing' } },
+              { $set: { messageStatus: 'processing', processingStartedAt: new Date() } },
             );
         }
         // MSG-08: if retry fails, leave message as 'pending' — next cycle picks up
