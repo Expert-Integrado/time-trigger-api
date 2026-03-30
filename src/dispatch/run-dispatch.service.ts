@@ -28,6 +28,19 @@ export class RunDispatchService {
   private isRunningFup = false;
   private isRunningMessages = false;
 
+  private readonly rateLimitRuns = parseInt(
+    process.env['RATE_LIMIT_RUNS'] ?? '10',
+    10,
+  );
+  private readonly rateLimitFup = parseInt(
+    process.env['RATE_LIMIT_FUP'] ?? '10',
+    10,
+  );
+  private readonly rateLimitMessages = parseInt(
+    process.env['RATE_LIMIT_MESSAGES'] ?? '10',
+    10,
+  );
+
   constructor(
     private readonly mongoService: MongoService,
     private readonly databaseScanService: DatabaseScanService,
@@ -165,6 +178,9 @@ export class RunDispatchService {
       return;
     }
 
+    let counterRuns = 0;
+    let counterFup = 0;
+
     // DETECT-03: fresh webhooks read every cycle
     const webhookDoc = await db.collection('webhooks').findOne<WebhookDoc>({});
     const webhookUrl = webhookDoc?.['Processador de Runs'];
@@ -180,7 +196,20 @@ export class RunDispatchService {
         .toArray();
 
       for (const run of runs) {
-        await this.webhookDispatchService.dispatch(db, run, webhookUrl);
+        if (counterRuns >= this.rateLimitRuns) {
+          this.logger.warn(
+            `[${dbName}] Rate limit reached for runs (${counterRuns}/${this.rateLimitRuns}) — skipping remaining items`,
+          );
+          break;
+        }
+        const claimed = await this.webhookDispatchService.dispatch(
+          db,
+          run,
+          webhookUrl,
+        );
+        if (claimed) {
+          counterRuns++;
+        }
       }
     }
 
@@ -202,10 +231,30 @@ export class RunDispatchService {
         .toArray();
 
       for (const fup of fups) {
+        if (counterFup >= this.rateLimitFup) {
+          this.logger.warn(
+            `[${dbName}] Rate limit reached for FUP (${counterFup}/${this.rateLimitFup}) — skipping remaining items`,
+          );
+          break;
+        }
         // FUP-09: dispatch each eligible FUP
-        await this.webhookDispatchService.dispatchFup(db, fup, fupWebhookUrl);
+        const claimed = await this.webhookDispatchService.dispatchFup(
+          db,
+          fup,
+          fupWebhookUrl,
+        );
+        if (claimed) {
+          counterFup++;
+        }
       }
     }
+
+    this.logger.log(
+      `[${dbName}] Runs: ${counterRuns}/${this.rateLimitRuns} dispatched`,
+    );
+    this.logger.log(
+      `[${dbName}] FUP: ${counterFup}/${this.rateLimitFup} dispatched`,
+    );
   }
 
   private async processDatabaseFup(dbName: string): Promise<void> {
@@ -244,6 +293,8 @@ export class RunDispatchService {
       return;
     }
 
+    let counterFup = 0;
+
     const fups: Document[] = await db
       .collection('fup')
       .find({
@@ -253,8 +304,25 @@ export class RunDispatchService {
       .toArray();
 
     for (const fup of fups) {
-      await this.webhookDispatchService.dispatchFup(db, fup, fupWebhookUrl);
+      if (counterFup >= this.rateLimitFup) {
+        this.logger.warn(
+          `[${dbName}] Rate limit reached for FUP (${counterFup}/${this.rateLimitFup}) — skipping remaining items`,
+        );
+        break;
+      }
+      const claimed = await this.webhookDispatchService.dispatchFup(
+        db,
+        fup,
+        fupWebhookUrl,
+      );
+      if (claimed) {
+        counterFup++;
+      }
     }
+
+    this.logger.log(
+      `[${dbName}] FUP: ${counterFup}/${this.rateLimitFup} dispatched`,
+    );
   }
 
   private async processDatabaseMessages(dbName: string): Promise<void> {
@@ -270,18 +338,33 @@ export class RunDispatchService {
       return;
     }
 
+    let counterMessages = 0;
+
     const messages: Document[] = await db
       .collection('messages')
       .find({ messageStatus: 'pending' })
       .toArray();
 
     for (const message of messages) {
-      await this.webhookDispatchService.dispatchMessage(
+      if (counterMessages >= this.rateLimitMessages) {
+        this.logger.warn(
+          `[${dbName}] Rate limit reached for messages (${counterMessages}/${this.rateLimitMessages}) — skipping remaining items`,
+        );
+        break;
+      }
+      const claimed = await this.webhookDispatchService.dispatchMessage(
         db,
         message,
         messagesWebhookUrl,
       );
+      if (claimed) {
+        counterMessages++;
+      }
     }
+
+    this.logger.log(
+      `[${dbName}] Messages: ${counterMessages}/${this.rateLimitMessages} dispatched`,
+    );
   }
 
   private isWithinTimeWindow(
