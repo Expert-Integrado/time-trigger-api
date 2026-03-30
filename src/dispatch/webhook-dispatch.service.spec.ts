@@ -536,4 +536,43 @@ describe('WebhookDispatchService - dispatchMessage', () => {
 
     expect(result).toBe(false);
   });
+
+  describe('processingStartedAt (DEP-01)', () => {
+    it('sets processingStartedAt in main dispatch path when message is claimed', async () => {
+      fetchMock.mockResolvedValueOnce({ ok: true });
+
+      await service.dispatchMessage(
+        mockMsgDb as unknown as Db,
+        message,
+        messagesWebhookUrl,
+      );
+
+      expect(mockMsgCollection.findOneAndUpdate).toHaveBeenCalledWith(
+        { _id: message._id, messageStatus: 'pending' },
+        {
+          $set: {
+            messageStatus: 'processing',
+            processingStartedAt: expect.any(Date),
+          },
+        },
+      );
+    });
+
+    it('sets processingStartedAt in retry path when message is claimed via retry', async () => {
+      fetchMock
+        .mockResolvedValueOnce({ ok: false }) // initial fails
+        .mockResolvedValueOnce({ ok: true }); // retry succeeds
+
+      await service.dispatchMessage(
+        mockMsgDb as unknown as Db,
+        message,
+        messagesWebhookUrl,
+      );
+
+      await jest.runAllTimersAsync();
+
+      const updateArg = mockMsgCollection.findOneAndUpdate.mock.calls[0][1];
+      expect(updateArg.$set.processingStartedAt).toEqual(expect.any(Date));
+    });
+  });
 });
