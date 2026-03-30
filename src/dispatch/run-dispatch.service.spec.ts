@@ -53,9 +53,9 @@ describe('RunDispatchService', () => {
         {
           provide: WebhookDispatchService,
           useValue: {
-            dispatch: jest.fn().mockResolvedValue(undefined),
-            dispatchFup: jest.fn().mockResolvedValue(undefined),
-            dispatchMessage: jest.fn().mockResolvedValue(undefined),
+            dispatch: jest.fn().mockResolvedValue(true),
+            dispatchFup: jest.fn().mockResolvedValue(true),
+            dispatchMessage: jest.fn().mockResolvedValue(true),
           },
         },
         {
@@ -893,5 +893,330 @@ describe('RunDispatchService', () => {
 
     resolveFirst();
     await firstCycle;
+  });
+
+  // ---- Rate Limiting tests ----
+
+  describe('Rate Limiting', () => {
+    // Helper: build a fresh service with a specific rate limit env var overridden
+    const buildServiceWithLimit = async (
+      overrides: Record<string, string>,
+    ): Promise<{
+      service: RunDispatchService;
+      webhookSvc: jest.Mocked<WebhookDispatchService>;
+      mongoSvc: jest.Mocked<MongoService>;
+      scanSvc: jest.Mocked<DatabaseScanService>;
+    }> => {
+      const original: Record<string, string | undefined> = {};
+      for (const [key, val] of Object.entries(overrides)) {
+        original[key] = process.env[key];
+        process.env[key] = val;
+      }
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          RunDispatchService,
+          {
+            provide: WebhookDispatchService,
+            useValue: {
+              dispatch: jest.fn().mockResolvedValue(true),
+              dispatchFup: jest.fn().mockResolvedValue(true),
+              dispatchMessage: jest.fn().mockResolvedValue(true),
+            },
+          },
+          { provide: MongoService, useValue: { db: jest.fn() } },
+          {
+            provide: DatabaseScanService,
+            useValue: {
+              getEligibleDatabases: jest.fn().mockResolvedValue(['test-db']),
+            },
+          },
+        ],
+      }).compile();
+
+      // Restore env vars after module compilation
+      for (const [key, val] of Object.entries(original)) {
+        if (val === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = val;
+        }
+      }
+
+      return {
+        service: module.get<RunDispatchService>(RunDispatchService),
+        webhookSvc: module.get(WebhookDispatchService),
+        mongoSvc: module.get(MongoService),
+        scanSvc: module.get(DatabaseScanService),
+      };
+    };
+
+    it('(RATE-06) does not increment counter when dispatch returns false', async () => {
+      // 3 runs, all claims fail (false)
+      webhookDispatchService.dispatch.mockResolvedValue(false);
+      const runs = [
+        { _id: 'r1', runStatus: 'waiting', waitUntil: 1 },
+        { _id: 'r2', runStatus: 'waiting', waitUntil: 1 },
+        { _id: 'r3', runStatus: 'waiting', waitUntil: 1 },
+      ];
+      const db = makeDb(withinWindowVars, webhooksDoc, runs);
+      mongoService.db.mockReturnValue(db as unknown as Db);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+      const logSpy = jest
+        .spyOn((service as any).logger, 'log')
+        .mockImplementation(() => {});
+
+      await service.runRunsCycle();
+
+      expect(webhookDispatchService.dispatch).toHaveBeenCalledTimes(3);
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Runs: 0/10 dispatched'),
+      );
+      jest.restoreAllMocks();
+    });
+
+    it('(RATE-06) increments counter only for successful claims', async () => {
+      // 3 runs: true, true, false
+      webhookDispatchService.dispatch
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false);
+      const runs = [
+        { _id: 'r1', runStatus: 'waiting', waitUntil: 1 },
+        { _id: 'r2', runStatus: 'waiting', waitUntil: 1 },
+        { _id: 'r3', runStatus: 'waiting', waitUntil: 1 },
+      ];
+      const db = makeDb(withinWindowVars, webhooksDoc, runs);
+      mongoService.db.mockReturnValue(db as unknown as Db);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+      const logSpy = jest
+        .spyOn((service as any).logger, 'log')
+        .mockImplementation(() => {});
+
+      await service.runRunsCycle();
+
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Runs: 2/10 dispatched'),
+      );
+      jest.restoreAllMocks();
+    });
+
+    it('(RATE-05) stops dispatching runs when limit is reached', async () => {
+      const { service: svc, webhookSvc, mongoSvc, scanSvc } =
+        await buildServiceWithLimit({ RATE_LIMIT_RUNS: '2' });
+
+      webhookSvc.dispatch.mockResolvedValue(true);
+      const runs = [
+        { _id: 'r1', runStatus: 'waiting', waitUntil: 1 },
+        { _id: 'r2', runStatus: 'waiting', waitUntil: 1 },
+        { _id: 'r3', runStatus: 'waiting', waitUntil: 1 },
+        { _id: 'r4', runStatus: 'waiting', waitUntil: 1 },
+        { _id: 'r5', runStatus: 'waiting', waitUntil: 1 },
+      ];
+      const db = makeDb(withinWindowVars, webhooksDoc, runs);
+      mongoSvc.db.mockReturnValue(db as unknown as Db);
+      scanSvc.getEligibleDatabases.mockResolvedValue(['test-db']);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+      const warnSpy = jest
+        .spyOn((svc as any).logger, 'warn')
+        .mockImplementation(() => {});
+      const logSpy = jest
+        .spyOn((svc as any).logger, 'log')
+        .mockImplementation(() => {});
+
+      await svc.runRunsCycle();
+
+      expect(webhookSvc.dispatch).toHaveBeenCalledTimes(2);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Rate limit reached for runs (2/2)'),
+      );
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Runs: 2/2 dispatched'),
+      );
+      jest.restoreAllMocks();
+    });
+
+    it('(RATE-05) stops dispatching FUP when limit is reached in processDatabaseRuns', async () => {
+      const { service: svc, webhookSvc, mongoSvc, scanSvc } =
+        await buildServiceWithLimit({ RATE_LIMIT_FUP: '1' });
+
+      webhookSvc.dispatchFup.mockResolvedValue(true);
+      const fups = [
+        { _id: 'f1', status: 'on', nextInteractionTimestamp: 1 },
+        { _id: 'f2', status: 'on', nextInteractionTimestamp: 1 },
+        { _id: 'f3', status: 'on', nextInteractionTimestamp: 1 },
+      ];
+      const db = makeDb(withinWindowVars, webhooksDoc, [], fups);
+      mongoSvc.db.mockReturnValue(db as unknown as Db);
+      scanSvc.getEligibleDatabases.mockResolvedValue(['test-db']);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+      const warnSpy = jest
+        .spyOn((svc as any).logger, 'warn')
+        .mockImplementation(() => {});
+
+      await svc.runRunsCycle();
+
+      expect(webhookSvc.dispatchFup).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Rate limit reached for FUP'),
+      );
+      jest.restoreAllMocks();
+    });
+
+    it('(RATE-05) stops dispatching messages when limit is reached', async () => {
+      const { service: svc, webhookSvc, mongoSvc, scanSvc } =
+        await buildServiceWithLimit({ RATE_LIMIT_MESSAGES: '2' });
+
+      webhookSvc.dispatchMessage.mockResolvedValue(true);
+      const messages = [
+        { _id: 'm1', messageStatus: 'pending' },
+        { _id: 'm2', messageStatus: 'pending' },
+        { _id: 'm3', messageStatus: 'pending' },
+        { _id: 'm4', messageStatus: 'pending' },
+        { _id: 'm5', messageStatus: 'pending' },
+      ];
+      const webhooksWithMessages = {
+        'Processador de Runs': 'https://hook.example.com',
+        'Gerenciador follow up': 'https://fup.example.com',
+        'mensagens pendentes': 'https://messages.example.com',
+      };
+      const db = makeDb(withinWindowVars, webhooksWithMessages, [], [], messages);
+      mongoSvc.db.mockReturnValue(db as unknown as Db);
+      scanSvc.getEligibleDatabases.mockResolvedValue(['test-db']);
+      const warnSpy = jest
+        .spyOn((svc as any).logger, 'warn')
+        .mockImplementation(() => {});
+
+      await svc.runMessagesCycle();
+
+      expect(webhookSvc.dispatchMessage).toHaveBeenCalledTimes(2);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Rate limit reached for messages'),
+      );
+      jest.restoreAllMocks();
+    });
+
+    it('(RATE-01) each database gets independent counters — one DB hitting limit does not affect another', async () => {
+      const { service: svc, webhookSvc, mongoSvc, scanSvc } =
+        await buildServiceWithLimit({ RATE_LIMIT_RUNS: '1' });
+
+      webhookSvc.dispatch.mockResolvedValue(true);
+
+      const run = { _id: 'r1', runStatus: 'waiting', waitUntil: 1 };
+      const runsForDb = [
+        { _id: 'r1', runStatus: 'waiting', waitUntil: 1 },
+        { _id: 'r2', runStatus: 'waiting', waitUntil: 1 },
+        { _id: 'r3', runStatus: 'waiting', waitUntil: 1 },
+      ];
+      void run; // suppress unused warning
+
+      const dbA = makeDb(withinWindowVars, webhooksDoc, runsForDb);
+      const dbB = makeDb(withinWindowVars, webhooksDoc, runsForDb);
+
+      scanSvc.getEligibleDatabases.mockResolvedValue(['db-a', 'db-b']);
+      mongoSvc.db.mockImplementation((name: string) => {
+        if (name === 'db-a') return dbA as unknown as Db;
+        return dbB as unknown as Db;
+      });
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+      jest
+        .spyOn((svc as any).logger, 'warn')
+        .mockImplementation(() => {});
+      jest
+        .spyOn((svc as any).logger, 'log')
+        .mockImplementation(() => {});
+
+      await svc.runRunsCycle();
+
+      // With limit=1 per DB and 2 DBs: dispatch called exactly 2 times total
+      expect(webhookSvc.dispatch).toHaveBeenCalledTimes(2);
+      jest.restoreAllMocks();
+    });
+
+    it('(RATE-07) counters reset to zero on each new cycle', async () => {
+      const { service: svc, webhookSvc, mongoSvc, scanSvc } =
+        await buildServiceWithLimit({ RATE_LIMIT_RUNS: '2' });
+
+      webhookSvc.dispatch.mockResolvedValue(true);
+      const runs = [
+        { _id: 'r1', runStatus: 'waiting', waitUntil: 1 },
+        { _id: 'r2', runStatus: 'waiting', waitUntil: 1 },
+        { _id: 'r3', runStatus: 'waiting', waitUntil: 1 },
+      ];
+      const db = makeDb(withinWindowVars, webhooksDoc, runs);
+      mongoSvc.db.mockReturnValue(db as unknown as Db);
+      scanSvc.getEligibleDatabases.mockResolvedValue(['test-db']);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+      jest
+        .spyOn((svc as any).logger, 'warn')
+        .mockImplementation(() => {});
+      jest
+        .spyOn((svc as any).logger, 'log')
+        .mockImplementation(() => {});
+
+      // First cycle: dispatch called 2 times (limit=2, 3 available)
+      await svc.runRunsCycle();
+      expect(webhookSvc.dispatch).toHaveBeenCalledTimes(2);
+
+      // Second cycle: dispatch called 2 more times (counter reset, not stuck at 2)
+      await svc.runRunsCycle();
+      expect(webhookSvc.dispatch).toHaveBeenCalledTimes(4);
+      jest.restoreAllMocks();
+    });
+
+    it('(D-10) logs dispatched/limit summary even when count is zero', async () => {
+      const db = makeDb(withinWindowVars, webhooksDoc, [], []);
+      mongoService.db.mockReturnValue(db as unknown as Db);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+      const logSpy = jest
+        .spyOn((service as any).logger, 'log')
+        .mockImplementation(() => {});
+
+      await service.runRunsCycle();
+
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Runs: 0/10 dispatched'),
+      );
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining('FUP: 0/10 dispatched'),
+      );
+      jest.restoreAllMocks();
+    });
+
+    it('(D-11) logs warn when rate limit is reached', async () => {
+      const { service: svc, webhookSvc, mongoSvc, scanSvc } =
+        await buildServiceWithLimit({ RATE_LIMIT_RUNS: '1' });
+
+      webhookSvc.dispatch.mockResolvedValue(true);
+      const runs = [
+        { _id: 'r1', runStatus: 'waiting', waitUntil: 1 },
+        { _id: 'r2', runStatus: 'waiting', waitUntil: 1 },
+      ];
+      const db = makeDb(withinWindowVars, webhooksDoc, runs);
+      mongoSvc.db.mockReturnValue(db as unknown as Db);
+      scanSvc.getEligibleDatabases.mockResolvedValue(['test-db']);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+      const warnSpy = jest
+        .spyOn((svc as any).logger, 'warn')
+        .mockImplementation(() => {});
+      jest
+        .spyOn((svc as any).logger, 'log')
+        .mockImplementation(() => {});
+
+      await svc.runRunsCycle();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Rate limit reached for runs (1/1) — skipping remaining items'),
+      );
+      jest.restoreAllMocks();
+    });
   });
 });
