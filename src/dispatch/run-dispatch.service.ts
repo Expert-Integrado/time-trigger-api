@@ -158,9 +158,7 @@ export class RunDispatchService {
 
   async runRecoveryCycle(): Promise<void> {
     if (this.isRunningRecovery) {
-      this.logger.warn(
-        'Recovery cycle skipped — previous cycle still running',
-      );
+      this.logger.warn('Recovery cycle skipped — previous cycle still running');
       return;
     }
     this.isRunningRecovery = true;
