@@ -946,7 +946,9 @@ describe('RunDispatchService', () => {
           },
           {
             provide: MessageCheckService,
-            useValue: { hasProcessingMessage: jest.fn().mockResolvedValue(false) },
+            useValue: {
+              hasProcessingMessage: jest.fn().mockResolvedValue(false),
+            },
           },
         ],
       }).compile();
@@ -1021,8 +1023,12 @@ describe('RunDispatchService', () => {
     });
 
     it('(RATE-05) stops dispatching runs when limit is reached', async () => {
-      const { service: svc, webhookSvc, mongoSvc, scanSvc } =
-        await buildServiceWithLimit({ RATE_LIMIT_RUNS: '2' });
+      const {
+        service: svc,
+        webhookSvc,
+        mongoSvc,
+        scanSvc,
+      } = await buildServiceWithLimit({ RATE_LIMIT_RUNS: '2' });
 
       webhookSvc.dispatch.mockResolvedValue(true);
       const runs = [
@@ -1057,8 +1063,12 @@ describe('RunDispatchService', () => {
     });
 
     it('(RATE-05) stops dispatching FUP when limit is reached in processDatabaseRuns', async () => {
-      const { service: svc, webhookSvc, mongoSvc, scanSvc } =
-        await buildServiceWithLimit({ RATE_LIMIT_FUP: '1' });
+      const {
+        service: svc,
+        webhookSvc,
+        mongoSvc,
+        scanSvc,
+      } = await buildServiceWithLimit({ RATE_LIMIT_FUP: '1' });
 
       webhookSvc.dispatchFup.mockResolvedValue(true);
       const fups = [
@@ -1085,8 +1095,12 @@ describe('RunDispatchService', () => {
     });
 
     it('(RATE-05) stops dispatching messages when limit is reached', async () => {
-      const { service: svc, webhookSvc, mongoSvc, scanSvc } =
-        await buildServiceWithLimit({ RATE_LIMIT_MESSAGES: '2' });
+      const {
+        service: svc,
+        webhookSvc,
+        mongoSvc,
+        scanSvc,
+      } = await buildServiceWithLimit({ RATE_LIMIT_MESSAGES: '2' });
 
       webhookSvc.dispatchMessage.mockResolvedValue(true);
       const messages = [
@@ -1101,7 +1115,13 @@ describe('RunDispatchService', () => {
         'Gerenciador follow up': 'https://fup.example.com',
         'mensagens pendentes': 'https://messages.example.com',
       };
-      const db = makeDb(withinWindowVars, webhooksWithMessages, [], [], messages);
+      const db = makeDb(
+        withinWindowVars,
+        webhooksWithMessages,
+        [],
+        [],
+        messages,
+      );
       mongoSvc.db.mockReturnValue(db as unknown as Db);
       scanSvc.getEligibleDatabases.mockResolvedValue(['test-db']);
       const warnSpy = jest
@@ -1118,8 +1138,12 @@ describe('RunDispatchService', () => {
     });
 
     it('(RATE-01) each database gets independent counters — one DB hitting limit does not affect another', async () => {
-      const { service: svc, webhookSvc, mongoSvc, scanSvc } =
-        await buildServiceWithLimit({ RATE_LIMIT_RUNS: '1' });
+      const {
+        service: svc,
+        webhookSvc,
+        mongoSvc,
+        scanSvc,
+      } = await buildServiceWithLimit({ RATE_LIMIT_RUNS: '1' });
 
       webhookSvc.dispatch.mockResolvedValue(true);
 
@@ -1141,12 +1165,8 @@ describe('RunDispatchService', () => {
       });
       jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
       jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
-      jest
-        .spyOn((svc as any).logger, 'warn')
-        .mockImplementation(() => {});
-      jest
-        .spyOn((svc as any).logger, 'log')
-        .mockImplementation(() => {});
+      jest.spyOn((svc as any).logger, 'warn').mockImplementation(() => {});
+      jest.spyOn((svc as any).logger, 'log').mockImplementation(() => {});
 
       await svc.runRunsCycle();
 
@@ -1156,8 +1176,12 @@ describe('RunDispatchService', () => {
     });
 
     it('(RATE-07) counters reset to zero on each new cycle', async () => {
-      const { service: svc, webhookSvc, mongoSvc, scanSvc } =
-        await buildServiceWithLimit({ RATE_LIMIT_RUNS: '2' });
+      const {
+        service: svc,
+        webhookSvc,
+        mongoSvc,
+        scanSvc,
+      } = await buildServiceWithLimit({ RATE_LIMIT_RUNS: '2' });
 
       webhookSvc.dispatch.mockResolvedValue(true);
       const runs = [
@@ -1170,12 +1194,8 @@ describe('RunDispatchService', () => {
       scanSvc.getEligibleDatabases.mockResolvedValue(['test-db']);
       jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
       jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
-      jest
-        .spyOn((svc as any).logger, 'warn')
-        .mockImplementation(() => {});
-      jest
-        .spyOn((svc as any).logger, 'log')
-        .mockImplementation(() => {});
+      jest.spyOn((svc as any).logger, 'warn').mockImplementation(() => {});
+      jest.spyOn((svc as any).logger, 'log').mockImplementation(() => {});
 
       // First cycle: dispatch called 2 times (limit=2, 3 available)
       await svc.runRunsCycle();
@@ -1208,8 +1228,12 @@ describe('RunDispatchService', () => {
     });
 
     it('(D-11) logs warn when rate limit is reached', async () => {
-      const { service: svc, webhookSvc, mongoSvc, scanSvc } =
-        await buildServiceWithLimit({ RATE_LIMIT_RUNS: '1' });
+      const {
+        service: svc,
+        webhookSvc,
+        mongoSvc,
+        scanSvc,
+      } = await buildServiceWithLimit({ RATE_LIMIT_RUNS: '1' });
 
       webhookSvc.dispatch.mockResolvedValue(true);
       const runs = [
@@ -1224,14 +1248,14 @@ describe('RunDispatchService', () => {
       const warnSpy = jest
         .spyOn((svc as any).logger, 'warn')
         .mockImplementation(() => {});
-      jest
-        .spyOn((svc as any).logger, 'log')
-        .mockImplementation(() => {});
+      jest.spyOn((svc as any).logger, 'log').mockImplementation(() => {});
 
       await svc.runRunsCycle();
 
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Rate limit reached for runs (1/1) — skipping remaining items'),
+        expect.stringContaining(
+          'Rate limit reached for runs (1/1) — skipping remaining items',
+        ),
       );
       jest.restoreAllMocks();
     });
@@ -1341,7 +1365,7 @@ describe('RunDispatchService', () => {
         expect.stringContaining('Recovery cycle skipped'),
       );
 
-      resolveFirst!();
+      resolveFirst();
       await firstCycle;
     });
 
@@ -1393,7 +1417,9 @@ describe('RunDispatchService', () => {
           },
           {
             provide: MessageCheckService,
-            useValue: { hasProcessingMessage: jest.fn().mockResolvedValue(false) },
+            useValue: {
+              hasProcessingMessage: jest.fn().mockResolvedValue(false),
+            },
           },
         ],
       }).compile();
@@ -1433,6 +1459,70 @@ describe('RunDispatchService', () => {
 
       expect(cutoff.getTime()).toBeGreaterThanOrEqual(expectedMin);
       expect(cutoff.getTime()).toBeLessThanOrEqual(expectedMax + 1000);
+    });
+  });
+
+  describe('Message-Run Dependency (DEP-02, DEP-03, DEP-04, DEP-05)', () => {
+    it('(DEP-02/DEP-03) skips run when processing message exists for same botIdentifier+chatDataId', async () => {
+      const run = {
+        _id: 'run-001',
+        runStatus: 'waiting',
+        waitUntil: 1,
+        botIdentifier: 'bot-x',
+        chatDataId: 'chat-y',
+      };
+      const db = makeDb(withinWindowVars, webhooksDoc, [run]);
+      mongoService.db.mockReturnValue(db as unknown as Db);
+      messageCheckService.hasProcessingMessage.mockResolvedValue(true);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+      await service.runRunsCycle();
+
+      expect(webhookDispatchService.dispatch).not.toHaveBeenCalled();
+      jest.restoreAllMocks();
+    });
+
+    it('(DEP-03) dispatches run normally when no processing message exists', async () => {
+      const run = {
+        _id: 'run-002',
+        runStatus: 'waiting',
+        waitUntil: 1,
+        botIdentifier: 'bot-x',
+        chatDataId: 'chat-y',
+      };
+      const db = makeDb(withinWindowVars, webhooksDoc, [run]);
+      mongoService.db.mockReturnValue(db as unknown as Db);
+      messageCheckService.hasProcessingMessage.mockResolvedValue(false);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+      await service.runRunsCycle();
+
+      expect(webhookDispatchService.dispatch).toHaveBeenCalledWith(
+        expect.anything(),
+        run,
+        expect.any(String),
+      );
+      jest.restoreAllMocks();
+    });
+
+    it('(DEP-04) dispatches run without dependency check when botIdentifier or chatDataId is absent', async () => {
+      const run = {
+        _id: 'run-003',
+        runStatus: 'waiting',
+        waitUntil: 1,
+      };
+      const db = makeDb(withinWindowVars, webhooksDoc, [run]);
+      mongoService.db.mockReturnValue(db as unknown as Db);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+      await service.runRunsCycle();
+
+      expect(messageCheckService.hasProcessingMessage).not.toHaveBeenCalled();
+      expect(webhookDispatchService.dispatch).toHaveBeenCalled();
+      jest.restoreAllMocks();
     });
   });
 });
