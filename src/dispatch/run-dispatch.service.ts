@@ -470,11 +470,11 @@ export class RunDispatchService {
 
   private isRunsEnabled(config: TimeTriggerConfig): boolean {
     if (config.enabledRuns !== undefined) return config.enabledRuns;
-    return config.enabled ?? true; // default true if neither field present
+    return config.enabled ?? false; // default false - must be explicitly enabled
   }
 
   private isFupsEnabled(config: TimeTriggerConfig): boolean {
     if (config.enabledFups !== undefined) return config.enabledFups;
-    return config.enabled ?? true;
+    return config.enabled ?? false; // default false - must be explicitly enabled
   }
 }

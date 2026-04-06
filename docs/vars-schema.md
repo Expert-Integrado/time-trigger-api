@@ -45,7 +45,7 @@ Variáveis de ambiente necessárias para iniciar o serviço:
 | `timeTrigger.nightLimit` | number | Sim | Hora máxima pra disparar (ex: 20 = 20h) |
 | `timeTrigger.allowedDays` | number[] | Sim | Dias da semana permitidos (0=Domingo, 1=Segunda ... 6=Sábado) |
 
-\*Se ausentes, usa o valor de `enabled` (default: true)
+\*Se ausentes, usa o valor de `enabled` (default: **false** - deve ser explicitamente habilitado)
 
 ## Valores dos Dias
 
