@@ -5,7 +5,7 @@ milestone_name: Rate Limiting and Message-Run Dependency
 status: executing
 stopped_at: Completed 10-02-PLAN.md
 last_updated: "2026-04-01T14:17:32.320Z"
-last_activity: 2026-04-01
+last_activity: 2026-04-06 - Completed quick task 260406-iim: Separar timeTrigger.enabled em enabledRuns e enabledFups para controle independente de cada fluxo
 progress:
   total_phases: 3
   completed_phases: 3
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 Phase: 11
 Plan: Not started
 Status: Executing Phase 11
-Last activity: 2026-04-01
+Last activity: 2026-04-06
 
 ## Performance Metrics
 
@@ -93,6 +93,12 @@ None.
 ### Blockers/Concerns
 
 - [Phase 10]: Confirm that run documents contain `chatDataId` field in production data before implementing the dependency filter. Research assumes yes but this should be verified.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260406-iim | Separar timeTrigger.enabled em enabledRuns e enabledFups para controle independente de cada fluxo | 2026-04-06 | 939aab7 | [260406-iim-separar-timetrigger-enabled-em-enabledru](./quick/260406-iim-separar-timetrigger-enabled-em-enabledru/) |
 
 ## Session Continuity
 
