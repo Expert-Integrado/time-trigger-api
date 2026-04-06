@@ -25,7 +25,8 @@ Variáveis de ambiente necessárias para iniciar o serviço:
   "botIdentifier": "sdr4blue",
 
   "timeTrigger": {
-    "enabled": true,
+    "enabledRuns": true,
+    "enabledFups": true,
     "morningLimit": 8,
     "nightLimit": 20,
     "allowedDays": [1, 2, 3, 4, 5]
@@ -37,10 +38,14 @@ Variáveis de ambiente necessárias para iniciar o serviço:
 
 | Campo | Tipo | Obrigatório | Descrição |
 |-------|------|-------------|-----------|
-| `timeTrigger.enabled` | boolean | Sim | `true` = processa runs e FUPs desse cliente, `false` = ignora |
+| `timeTrigger.enabledRuns` | boolean | Sim* | `true` = processa runs desse cliente, `false` = ignora runs |
+| `timeTrigger.enabledFups` | boolean | Sim* | `true` = processa FUPs desse cliente, `false` = ignora FUPs |
+| `timeTrigger.enabled` | boolean | DEPRECATED | Usado para backward compat. Se enabledRuns/enabledFups ausentes, usa esse valor para ambos |
 | `timeTrigger.morningLimit` | number | Sim | Hora mínima pra disparar (ex: 8 = 8h da manhã) |
 | `timeTrigger.nightLimit` | number | Sim | Hora máxima pra disparar (ex: 20 = 20h) |
 | `timeTrigger.allowedDays` | number[] | Sim | Dias da semana permitidos (0=Domingo, 1=Segunda ... 6=Sábado) |
+
+\*Se ausentes, usa o valor de `enabled` (default: true)
 
 ## Valores dos Dias
 
@@ -60,7 +65,8 @@ Variáveis de ambiente necessárias para iniciar o serviço:
 ```json
 {
   "timeTrigger": {
-    "enabled": true,
+    "enabledRuns": true,
+    "enabledFups": true,
     "morningLimit": 8,
     "nightLimit": 20,
     "allowedDays": [1, 2, 3, 4, 5]
@@ -72,7 +78,8 @@ Variáveis de ambiente necessárias para iniciar o serviço:
 ```json
 {
   "timeTrigger": {
-    "enabled": true,
+    "enabledRuns": true,
+    "enabledFups": true,
     "morningLimit": 0,
     "nightLimit": 24,
     "allowedDays": [0, 1, 2, 3, 4, 5, 6]
@@ -80,11 +87,38 @@ Variáveis de ambiente necessárias para iniciar o serviço:
 }
 ```
 
-### Desativado
+### Apenas Runs (sem FUP)
 ```json
 {
   "timeTrigger": {
-    "enabled": false,
+    "enabledRuns": true,
+    "enabledFups": false,
+    "morningLimit": 8,
+    "nightLimit": 20,
+    "allowedDays": [1, 2, 3, 4, 5]
+  }
+}
+```
+
+### Apenas FUP (sem Runs)
+```json
+{
+  "timeTrigger": {
+    "enabledRuns": false,
+    "enabledFups": true,
+    "morningLimit": 8,
+    "nightLimit": 20,
+    "allowedDays": [1, 2, 3, 4, 5]
+  }
+}
+```
+
+### Desativado (ambos)
+```json
+{
+  "timeTrigger": {
+    "enabledRuns": false,
+    "enabledFups": false,
     "morningLimit": 0,
     "nightLimit": 0,
     "allowedDays": []
@@ -96,7 +130,8 @@ Variáveis de ambiente necessárias para iniciar o serviço:
 ```json
 {
   "timeTrigger": {
-    "enabled": true,
+    "enabledRuns": true,
+    "enabledFups": true,
     "morningLimit": 9,
     "nightLimit": 18,
     "allowedDays": [1, 2, 3, 4, 5, 6]
@@ -120,11 +155,13 @@ Variáveis de ambiente necessárias para iniciar o serviço:
 - Sucesso: `status` → `"queued"`
 - Retry: 1x após 1 min, falha mantém `status: "on"`
 
-### Controles do timeTrigger (aplicam a runs E FUPs)
+### Controles do timeTrigger
 - Se `timeTrigger` não existir no vars → **ignora o banco** (não processa nada)
-- Se `enabled: false` → **ignora o banco**
-- Se hora atual < `morningLimit` ou >= `nightLimit` → **pula runs e FUPs**
-- Se dia da semana não está no `allowedDays` → **pula runs e FUPs**
+- Se `enabledRuns: false` → **ignora runs**, mas FUPs podem rodar se `enabledFups: true`
+- Se `enabledFups: false` → **ignora FUPs**, mas runs podem rodar se `enabledRuns: true`
+- Backward compat: Se `enabled` presente e novos campos ausentes, usa `enabled` para ambos
+- Se hora atual < `morningLimit` ou >= `nightLimit` → **pula runs e FUPs** (se habilitados)
+- Se dia da semana não está no `allowedDays` → **pula runs e FUPs** (se habilitados)
 - Lê vars **a cada ciclo** (mudanças aplicam imediatamente)
 
 ## Webhooks Necessários
