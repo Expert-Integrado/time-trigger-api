@@ -92,7 +92,8 @@ describe('RunDispatchService', () => {
 
   const withinWindowVars = {
     timeTrigger: {
-      enabled: true,
+      enabledRuns: true,
+      enabledFups: true,
       morningLimit: 8,
       nightLimit: 22,
       allowedDays: [0, 1, 2, 3, 4, 5, 6],
@@ -195,7 +196,7 @@ describe('RunDispatchService', () => {
     jest.restoreAllMocks();
   });
 
-  it('(TRIG-03) skips when timeTrigger.enabled is false', async () => {
+  it('(TRIG-03-legacy) skips when timeTrigger.enabled is false (backward compat)', async () => {
     const db = makeDb(
       {
         timeTrigger: {
@@ -215,6 +216,95 @@ describe('RunDispatchService', () => {
     await service.runRunsCycle();
 
     expect(webhookDispatchService.dispatch).not.toHaveBeenCalled();
+    expect(webhookDispatchService.dispatchFup).not.toHaveBeenCalled();
+    jest.restoreAllMocks();
+  });
+
+  it('(TRIG-03a) skips runs but dispatches FUP when enabledRuns=false, enabledFups=true', async () => {
+    const vars = {
+      timeTrigger: {
+        enabledRuns: false,
+        enabledFups: true,
+        morningLimit: 8,
+        nightLimit: 22,
+        allowedDays: [0, 1, 2, 3, 4, 5, 6],
+      },
+    };
+    const db = makeDb(vars, webhooksDoc, [eligibleRun], [eligibleFup]);
+    mongoService.db.mockReturnValue(db as unknown as Db);
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+    await service.runRunsCycle();
+
+    expect(webhookDispatchService.dispatch).not.toHaveBeenCalled();
+    expect(webhookDispatchService.dispatchFup).toHaveBeenCalledTimes(1);
+    jest.restoreAllMocks();
+  });
+
+  it('(TRIG-03b) dispatches runs but skips FUP when enabledRuns=true, enabledFups=false', async () => {
+    const vars = {
+      timeTrigger: {
+        enabledRuns: true,
+        enabledFups: false,
+        morningLimit: 8,
+        nightLimit: 22,
+        allowedDays: [0, 1, 2, 3, 4, 5, 6],
+      },
+    };
+    const db = makeDb(vars, webhooksDoc, [eligibleRun], [eligibleFup]);
+    mongoService.db.mockReturnValue(db as unknown as Db);
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+    await service.runRunsCycle();
+
+    expect(webhookDispatchService.dispatch).toHaveBeenCalledTimes(1);
+    expect(webhookDispatchService.dispatchFup).not.toHaveBeenCalled();
+    jest.restoreAllMocks();
+  });
+
+  it('(TRIG-03c) skips both when enabledRuns=false and enabledFups=false', async () => {
+    const vars = {
+      timeTrigger: {
+        enabledRuns: false,
+        enabledFups: false,
+        morningLimit: 8,
+        nightLimit: 22,
+        allowedDays: [0, 1, 2, 3, 4, 5, 6],
+      },
+    };
+    const db = makeDb(vars, webhooksDoc, [eligibleRun], [eligibleFup]);
+    mongoService.db.mockReturnValue(db as unknown as Db);
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+    await service.runRunsCycle();
+
+    expect(webhookDispatchService.dispatch).not.toHaveBeenCalled();
+    expect(webhookDispatchService.dispatchFup).not.toHaveBeenCalled();
+    jest.restoreAllMocks();
+  });
+
+  it('(TRIG-03d) dispatches both when enabledRuns=true and enabledFups=true', async () => {
+    const vars = {
+      timeTrigger: {
+        enabledRuns: true,
+        enabledFups: true,
+        morningLimit: 8,
+        nightLimit: 22,
+        allowedDays: [0, 1, 2, 3, 4, 5, 6],
+      },
+    };
+    const db = makeDb(vars, webhooksDoc, [eligibleRun], [eligibleFup]);
+    mongoService.db.mockReturnValue(db as unknown as Db);
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+    await service.runRunsCycle();
+
+    expect(webhookDispatchService.dispatch).toHaveBeenCalledTimes(1);
+    expect(webhookDispatchService.dispatchFup).toHaveBeenCalledTimes(1);
     jest.restoreAllMocks();
   });
 
@@ -650,6 +740,27 @@ describe('RunDispatchService', () => {
     const db = makeDb(withinWindowVars, webhooksDoc, [], [eligibleFup]);
     mongoService.db.mockReturnValue(db as unknown as Db);
     jest.spyOn(Date.prototype, 'getHours').mockReturnValue(3); // before morningLimit
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+    await service.runFupCycle();
+
+    expect(webhookDispatchService.dispatchFup).not.toHaveBeenCalled();
+    jest.restoreAllMocks();
+  });
+
+  it('runFupCycle skips when enabledFups=false', async () => {
+    const vars = {
+      timeTrigger: {
+        enabledRuns: true,
+        enabledFups: false,
+        morningLimit: 8,
+        nightLimit: 22,
+        allowedDays: [0, 1, 2, 3, 4, 5, 6],
+      },
+    };
+    const db = makeDb(vars, webhooksDoc, [], [eligibleFup]);
+    mongoService.db.mockReturnValue(db as unknown as Db);
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
     jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
 
     await service.runFupCycle();

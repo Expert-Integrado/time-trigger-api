@@ -6,7 +6,9 @@ import { MessageCheckService } from './message-check.service.js';
 import { Db, Document } from 'mongodb';
 
 interface TimeTriggerConfig {
-  enabled: boolean;
+  enabled?: boolean; // DEPRECATED - backward compat only
+  enabledRuns?: boolean; // NEW - controls runs dispatch
+  enabledFups?: boolean; // NEW - controls FUP dispatch
   morningLimit: number;
   nightLimit: number;
   allowedDays: number[]; // 0=Domingo...6=Sábado
@@ -216,11 +218,6 @@ export class RunDispatchService {
       this.logger.warn(`[${dbName}] timeTrigger not found in vars — skipping`);
       return;
     }
-    if (!vars.timeTrigger.enabled) {
-      // TRIG-03: enabled flag
-      this.logger.warn(`[${dbName}] timeTrigger.enabled is false — skipping`);
-      return;
-    }
     if (
       // TRIG-04: time gate (TZ=America/Sao_Paulo makes getHours() return Brazil time)
       !this.isWithinTimeWindow(
@@ -241,12 +238,19 @@ export class RunDispatchService {
 
     // DETECT-03: fresh webhooks read every cycle
     const webhookDoc = await db.collection('webhooks').findOne<WebhookDoc>({});
-    const webhookUrl = webhookDoc?.['Processador de Runs'];
-    if (!webhookUrl) {
+
+    // Check enabledRuns before processing runs
+    if (!this.isRunsEnabled(vars.timeTrigger)) {
       this.logger.warn(
-        `[${dbName}] "Processador de Runs" URL missing from webhooks — skipping`,
+        `[${dbName}] timeTrigger.enabledRuns is false — skipping runs`,
       );
     } else {
+      const webhookUrl = webhookDoc?.['Processador de Runs'];
+      if (!webhookUrl) {
+        this.logger.warn(
+          `[${dbName}] "Processador de Runs" URL missing from webhooks — skipping`,
+        );
+      } else {
       // DETECT-01: find waiting runs with waitUntil in the past
       const runs: Document[] = await db
         .collection('runs')
@@ -285,17 +289,24 @@ export class RunDispatchService {
           counterRuns++;
         }
       }
+      }
     }
 
     // FUP-01, FUP-04: detect eligible FUPs (same timeTrigger gate scope as runs)
-    const fupWebhookUrl = webhookDoc?.['Gerenciador follow up'] as
-      | string
-      | undefined;
-    if (!fupWebhookUrl) {
+    // Check enabledFups before processing FUPs
+    if (!this.isFupsEnabled(vars.timeTrigger)) {
       this.logger.warn(
-        `[${dbName}] "Gerenciador follow up" URL missing from webhooks — skipping FUP dispatch`,
+        `[${dbName}] timeTrigger.enabledFups is false — skipping FUP`,
       );
     } else {
+      const fupWebhookUrl = webhookDoc?.['Gerenciador follow up'] as
+        | string
+        | undefined;
+      if (!fupWebhookUrl) {
+        this.logger.warn(
+          `[${dbName}] "Gerenciador follow up" URL missing from webhooks — skipping FUP dispatch`,
+        );
+      } else {
       const fups: Document[] = await db
         .collection('fup')
         .find({
@@ -321,6 +332,7 @@ export class RunDispatchService {
           counterFup++;
         }
       }
+      }
     }
 
     this.logger.log(
@@ -340,8 +352,10 @@ export class RunDispatchService {
       this.logger.warn(`[${dbName}] timeTrigger not found in vars — skipping`);
       return;
     }
-    if (!vars.timeTrigger.enabled) {
-      this.logger.warn(`[${dbName}] timeTrigger.enabled is false — skipping`);
+    if (!this.isFupsEnabled(vars.timeTrigger)) {
+      this.logger.warn(
+        `[${dbName}] timeTrigger.enabledFups is false — skipping`,
+      );
       return;
     }
     if (
@@ -452,5 +466,15 @@ export class RunDispatchService {
   private isAllowedDay(allowedDays: number[]): boolean {
     const currentDay = new Date().getDay(); // Brazil time due to TZ env
     return allowedDays.includes(currentDay);
+  }
+
+  private isRunsEnabled(config: TimeTriggerConfig): boolean {
+    if (config.enabledRuns !== undefined) return config.enabledRuns;
+    return config.enabled ?? true; // default true if neither field present
+  }
+
+  private isFupsEnabled(config: TimeTriggerConfig): boolean {
+    if (config.enabledFups !== undefined) return config.enabledFups;
+    return config.enabled ?? true;
   }
 }
