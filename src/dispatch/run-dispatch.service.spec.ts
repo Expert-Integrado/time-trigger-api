@@ -2190,4 +2190,212 @@ describe('RunDispatchService', () => {
       jest.restoreAllMocks();
     });
   });
+
+  describe('Multi-bot webhook resolution — generic doc lacks URL but bot-specific doc has it', () => {
+    it('(MULTI-BOT-RUNS-01) run with botIdentifier dispatches even when generic webhookDoc lacks Processador de Runs', async () => {
+      const run = {
+        _id: 'run-mb-01',
+        runStatus: 'waiting',
+        waitUntil: 1,
+        botIdentifier: 'BotX',
+      };
+      // Generic doc has NO Processador de Runs
+      const db = makeDb(
+        withinWindowVars,
+        { 'Gerenciador follow up': 'https://fup.example.com' },
+        [run],
+      );
+      (db as any)._collections.webhooks.findOne = jest
+        .fn()
+        .mockImplementation((filter: any) => {
+          if (filter?.botIdentifier === 'BotX') {
+            return Promise.resolve({
+              botIdentifier: 'BotX',
+              'Processador de Runs': 'https://botx-runs.example.com',
+            });
+          }
+          return Promise.resolve({
+            'Gerenciador follow up': 'https://fup.example.com',
+          });
+        });
+      mongoService.db.mockReturnValue(db as unknown as Db);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+      await service.runRunsCycle();
+
+      expect(webhookDispatchService.dispatch).toHaveBeenCalledWith(
+        expect.anything(),
+        run,
+        'https://botx-runs.example.com',
+      );
+      jest.restoreAllMocks();
+    });
+
+    it('(MULTI-BOT-RUNS-02) run WITHOUT botIdentifier skipped when generic doc lacks URL — does not block other runs', async () => {
+      const runWithBot = {
+        _id: 'run-mb-02a',
+        runStatus: 'waiting',
+        waitUntil: 1,
+        botIdentifier: 'BotX',
+      };
+      const runWithoutBot = {
+        _id: 'run-mb-02b',
+        runStatus: 'waiting',
+        waitUntil: 1,
+        // no botIdentifier
+      };
+      // Generic doc has NO Processador de Runs
+      const db = makeDb(
+        withinWindowVars,
+        { 'Gerenciador follow up': 'https://fup.example.com' },
+        [runWithBot, runWithoutBot],
+      );
+      (db as any)._collections.webhooks.findOne = jest
+        .fn()
+        .mockImplementation((filter: any) => {
+          if (filter?.botIdentifier === 'BotX') {
+            return Promise.resolve({
+              botIdentifier: 'BotX',
+              'Processador de Runs': 'https://botx-runs.example.com',
+            });
+          }
+          return Promise.resolve({
+            'Gerenciador follow up': 'https://fup.example.com',
+          });
+        });
+      mongoService.db.mockReturnValue(db as unknown as Db);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+      const warnSpy = jest
+        .spyOn((service as any).logger, 'warn')
+        .mockImplementation(() => {});
+
+      await service.runRunsCycle();
+
+      expect(webhookDispatchService.dispatch).toHaveBeenCalledTimes(1);
+      expect(webhookDispatchService.dispatch).toHaveBeenCalledWith(
+        expect.anything(),
+        runWithBot,
+        'https://botx-runs.example.com',
+      );
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('run-mb-02b'),
+      );
+      jest.restoreAllMocks();
+    });
+
+    it('(MULTI-BOT-FUP-01) FUP with botIdentifier dispatches even when generic doc lacks Gerenciador follow up — processDatabaseRuns', async () => {
+      const fup = {
+        _id: 'fup-mb-01',
+        status: 'on',
+        nextInteractionTimestamp: 1,
+        botIdentifier: 'BotX',
+      };
+      // Generic doc has NO Gerenciador follow up
+      const db = makeDb(
+        withinWindowVars,
+        { 'Processador de Runs': 'https://hook.example.com' },
+        [],
+        [fup],
+      );
+      (db as any)._collections.webhooks.findOne = jest
+        .fn()
+        .mockImplementation((filter: any) => {
+          if (filter?.botIdentifier === 'BotX') {
+            return Promise.resolve({
+              botIdentifier: 'BotX',
+              'Gerenciador follow up': 'https://botx-fup.example.com',
+            });
+          }
+          return Promise.resolve({
+            'Processador de Runs': 'https://hook.example.com',
+          });
+        });
+      mongoService.db.mockReturnValue(db as unknown as Db);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+      await service.runRunsCycle();
+
+      expect(webhookDispatchService.dispatchFup).toHaveBeenCalledWith(
+        expect.anything(),
+        fup,
+        'https://botx-fup.example.com',
+      );
+      jest.restoreAllMocks();
+    });
+
+    it('(MULTI-BOT-FUP-02) FUP with botIdentifier dispatches even when generic doc lacks URL — processDatabaseFup standalone', async () => {
+      const fup = {
+        _id: 'fup-mb-02',
+        status: 'on',
+        nextInteractionTimestamp: 1,
+        botIdentifier: 'BotX',
+      };
+      // Generic doc has NO Gerenciador follow up
+      const db = makeDb(
+        withinWindowVars,
+        { 'Processador de Runs': 'https://hook.example.com' },
+        [],
+        [fup],
+      );
+      (db as any)._collections.webhooks.findOne = jest
+        .fn()
+        .mockImplementation((filter: any) => {
+          if (filter?.botIdentifier === 'BotX') {
+            return Promise.resolve({
+              botIdentifier: 'BotX',
+              'Gerenciador follow up': 'https://botx-fup.example.com',
+            });
+          }
+          return Promise.resolve({
+            'Processador de Runs': 'https://hook.example.com',
+          });
+        });
+      mongoService.db.mockReturnValue(db as unknown as Db);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+      await service.runFupCycle();
+
+      expect(webhookDispatchService.dispatchFup).toHaveBeenCalledWith(
+        expect.anything(),
+        fup,
+        'https://botx-fup.example.com',
+      );
+      jest.restoreAllMocks();
+    });
+
+    it('(MULTI-BOT-MSG-01) message with botIdentifier dispatches even when generic doc lacks mensagens pendentes', async () => {
+      const message = {
+        _id: 'msg-mb-01',
+        messageStatus: 'pending',
+        botIdentifier: 'BotX',
+      };
+      // Generic doc has NO mensagens pendentes
+      const db = makeDb(withinWindowVars, {}, [], [], [message]);
+      (db as any)._collections.webhooks.findOne = jest
+        .fn()
+        .mockImplementation((filter: any) => {
+          if (filter?.botIdentifier === 'BotX') {
+            return Promise.resolve({
+              botIdentifier: 'BotX',
+              'mensagens pendentes': 'https://botx-messages.example.com',
+            });
+          }
+          return Promise.resolve({});
+        });
+      mongoService.db.mockReturnValue(db as unknown as Db);
+
+      await service.runMessagesCycle();
+
+      expect(webhookDispatchService.dispatchMessage).toHaveBeenCalledWith(
+        expect.anything(),
+        message,
+        'https://botx-messages.example.com',
+      );
+      jest.restoreAllMocks();
+    });
+  });
 });
