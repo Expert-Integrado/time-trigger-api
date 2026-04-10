@@ -1573,6 +1573,193 @@ describe('RunDispatchService', () => {
     });
   });
 
+  describe('Webhook per-botIdentifier lookup', () => {
+    it('(WEBHOOK-BOT-01) run with botIdentifier dispatches to bot-specific webhook URL when matching webhooks doc exists', async () => {
+      const run = {
+        _id: 'run-bot-01',
+        runStatus: 'waiting',
+        waitUntil: 1,
+        botIdentifier: 'bot-A',
+        chatDataId: 'chat-1',
+      };
+      const db = makeDb(withinWindowVars, webhooksDoc, [run]);
+      // Override webhooks.findOne to be filter-aware
+      (db as any)._collections.webhooks.findOne = jest
+        .fn()
+        .mockImplementation((filter: any) => {
+          if (filter?.botIdentifier === 'bot-A') {
+            return Promise.resolve({
+              botIdentifier: 'bot-A',
+              'Processador de Runs': 'https://bot-a-hook.example.com',
+            });
+          }
+          return Promise.resolve({
+            'Processador de Runs': 'https://hook.example.com',
+          });
+        });
+      mongoService.db.mockReturnValue(db as unknown as Db);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+      await service.runRunsCycle();
+
+      expect(webhookDispatchService.dispatch).toHaveBeenCalledWith(
+        expect.anything(),
+        run,
+        'https://bot-a-hook.example.com',
+      );
+      jest.restoreAllMocks();
+    });
+
+    it('(WEBHOOK-BOT-02) run with botIdentifier falls back to generic webhook URL when no bot-specific doc found', async () => {
+      const run = {
+        _id: 'run-bot-02',
+        runStatus: 'waiting',
+        waitUntil: 1,
+        botIdentifier: 'bot-B',
+        chatDataId: 'chat-2',
+      };
+      const db = makeDb(withinWindowVars, webhooksDoc, [run]);
+      (db as any)._collections.webhooks.findOne = jest
+        .fn()
+        .mockImplementation((filter: any) => {
+          if (filter?.botIdentifier === 'bot-B') {
+            return Promise.resolve(null); // no bot-specific doc
+          }
+          return Promise.resolve({
+            'Processador de Runs': 'https://hook.example.com',
+          });
+        });
+      mongoService.db.mockReturnValue(db as unknown as Db);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+      await service.runRunsCycle();
+
+      expect(webhookDispatchService.dispatch).toHaveBeenCalledWith(
+        expect.anything(),
+        run,
+        'https://hook.example.com',
+      );
+      jest.restoreAllMocks();
+    });
+
+    it('(WEBHOOK-BOT-03) run with botIdentifier falls back to generic URL when bot-specific doc has no Processador de Runs key', async () => {
+      const run = {
+        _id: 'run-bot-03',
+        runStatus: 'waiting',
+        waitUntil: 1,
+        botIdentifier: 'bot-C',
+        chatDataId: 'chat-3',
+      };
+      const db = makeDb(withinWindowVars, webhooksDoc, [run]);
+      (db as any)._collections.webhooks.findOne = jest
+        .fn()
+        .mockImplementation((filter: any) => {
+          if (filter?.botIdentifier === 'bot-C') {
+            return Promise.resolve({
+              botIdentifier: 'bot-C',
+              FUP: 'https://fup.example.com',
+              // no 'Processador de Runs' key
+            });
+          }
+          return Promise.resolve({
+            'Processador de Runs': 'https://hook.example.com',
+          });
+        });
+      mongoService.db.mockReturnValue(db as unknown as Db);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+      await service.runRunsCycle();
+
+      expect(webhookDispatchService.dispatch).toHaveBeenCalledWith(
+        expect.anything(),
+        run,
+        'https://hook.example.com',
+      );
+      jest.restoreAllMocks();
+    });
+
+    it('(WEBHOOK-BOT-04) run without botIdentifier uses generic webhook URL and does NOT do per-bot lookup', async () => {
+      const run = {
+        _id: 'run-bot-04',
+        runStatus: 'waiting',
+        waitUntil: 1,
+        // no botIdentifier
+      };
+      const db = makeDb(withinWindowVars, webhooksDoc, [run]);
+      const webhooksFindOne = (db as any)._collections.webhooks
+        .findOne as jest.Mock;
+      mongoService.db.mockReturnValue(db as unknown as Db);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+      await service.runRunsCycle();
+
+      // findOne called only once with {} (the generic fetch) — no per-bot call
+      expect(webhooksFindOne).toHaveBeenCalledTimes(1);
+      expect(webhooksFindOne).toHaveBeenCalledWith({});
+      expect(webhookDispatchService.dispatch).toHaveBeenCalledWith(
+        expect.anything(),
+        run,
+        'https://hook.example.com',
+      );
+      jest.restoreAllMocks();
+    });
+
+    it('(WEBHOOK-BOT-05) multiple runs in same cycle — one with matching bot webhook, one without botIdentifier — each dispatches to correct URL', async () => {
+      const runWithBot = {
+        _id: 'run-bot-05a',
+        runStatus: 'waiting',
+        waitUntil: 1,
+        botIdentifier: 'bot-A',
+        chatDataId: 'chat-a',
+      };
+      const runWithoutBot = {
+        _id: 'run-bot-05b',
+        runStatus: 'waiting',
+        waitUntil: 1,
+        // no botIdentifier
+      };
+      const db = makeDb(withinWindowVars, webhooksDoc, [
+        runWithBot,
+        runWithoutBot,
+      ]);
+      (db as any)._collections.webhooks.findOne = jest
+        .fn()
+        .mockImplementation((filter: any) => {
+          if (filter?.botIdentifier === 'bot-A') {
+            return Promise.resolve({
+              botIdentifier: 'bot-A',
+              'Processador de Runs': 'https://bot-a-hook.example.com',
+            });
+          }
+          return Promise.resolve({
+            'Processador de Runs': 'https://hook.example.com',
+          });
+        });
+      mongoService.db.mockReturnValue(db as unknown as Db);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+      await service.runRunsCycle();
+
+      expect(webhookDispatchService.dispatch).toHaveBeenCalledTimes(2);
+      expect(webhookDispatchService.dispatch).toHaveBeenCalledWith(
+        expect.anything(),
+        runWithBot,
+        'https://bot-a-hook.example.com',
+      );
+      expect(webhookDispatchService.dispatch).toHaveBeenCalledWith(
+        expect.anything(),
+        runWithoutBot,
+        'https://hook.example.com',
+      );
+      jest.restoreAllMocks();
+    });
+  });
+
   describe('Message-Run Dependency (DEP-02, DEP-03, DEP-04, DEP-05)', () => {
     it('(DEP-02/DEP-03) skips run when processing message exists for same botIdentifier+chatDataId', async () => {
       const run = {

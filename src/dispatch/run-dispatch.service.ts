@@ -280,10 +280,21 @@ export class RunDispatchService {
             continue;
           }
         }
+        // Resolve per-run webhook URL: bot-specific takes priority over generic
+        let runWebhookUrl = webhookUrl; // default to generic
+        if (botIdentifier) {
+          const botWebhookDoc = await db
+            .collection('webhooks')
+            .findOne<WebhookDoc>({ botIdentifier });
+          const botSpecificUrl = botWebhookDoc?.['Processador de Runs'];
+          if (botSpecificUrl) {
+            runWebhookUrl = botSpecificUrl;
+          }
+        }
         const claimed = await this.webhookDispatchService.dispatch(
           db,
           run,
-          webhookUrl,
+          runWebhookUrl,
         );
         if (claimed) {
           counterRuns++;
