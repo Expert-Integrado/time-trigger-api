@@ -333,11 +333,24 @@ export class RunDispatchService {
           );
           break;
         }
-        // FUP-09: dispatch each eligible FUP
+        // FUP-09: dispatch each eligible FUP with bot-specific URL resolution
+        const fupBotIdentifier = fup['botIdentifier'] as string | undefined;
+        let resolvedFupUrl = fupWebhookUrl;
+        if (fupBotIdentifier) {
+          const botWebhookDoc = await db
+            .collection('webhooks')
+            .findOne<WebhookDoc>({ botIdentifier: fupBotIdentifier });
+          const botSpecificUrl = botWebhookDoc?.['Gerenciador follow up'] as
+            | string
+            | undefined;
+          if (botSpecificUrl) {
+            resolvedFupUrl = botSpecificUrl;
+          }
+        }
         const claimed = await this.webhookDispatchService.dispatchFup(
           db,
           fup,
-          fupWebhookUrl,
+          resolvedFupUrl,
         );
         if (claimed) {
           counterFup++;
@@ -409,10 +422,23 @@ export class RunDispatchService {
         );
         break;
       }
+      const fupBotIdentifier = fup['botIdentifier'] as string | undefined;
+      let resolvedFupUrl = fupWebhookUrl;
+      if (fupBotIdentifier) {
+        const botWebhookDoc = await db
+          .collection('webhooks')
+          .findOne<WebhookDoc>({ botIdentifier: fupBotIdentifier });
+        const botSpecificUrl = botWebhookDoc?.['Gerenciador follow up'] as
+          | string
+          | undefined;
+        if (botSpecificUrl) {
+          resolvedFupUrl = botSpecificUrl;
+        }
+      }
       const claimed = await this.webhookDispatchService.dispatchFup(
         db,
         fup,
-        fupWebhookUrl,
+        resolvedFupUrl,
       );
       if (claimed) {
         counterFup++;
@@ -451,10 +477,21 @@ export class RunDispatchService {
         );
         break;
       }
+      const msgBotIdentifier = message['botIdentifier'] as string | undefined;
+      let resolvedMsgUrl = messagesWebhookUrl;
+      if (msgBotIdentifier) {
+        const botWebhookDoc = await db
+          .collection('webhooks')
+          .findOne<WebhookDoc>({ botIdentifier: msgBotIdentifier });
+        const botSpecificUrl = botWebhookDoc?.['mensagens pendentes'];
+        if (botSpecificUrl) {
+          resolvedMsgUrl = botSpecificUrl;
+        }
+      }
       const claimed = await this.webhookDispatchService.dispatchMessage(
         db,
         message,
-        messagesWebhookUrl,
+        resolvedMsgUrl,
       );
       if (claimed) {
         counterMessages++;
