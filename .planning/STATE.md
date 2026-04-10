@@ -99,6 +99,7 @@ None.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260406-iim | Separar timeTrigger.enabled em enabledRuns e enabledFups para controle independente de cada fluxo | 2026-04-06 | 939aab7 | [260406-iim-separar-timetrigger-enabled-em-enabledru](./quick/260406-iim-separar-timetrigger-enabled-em-enabledru/) |
+| 260410-jty | Implementar lookup de webhook por botIdentifier | 2026-04-10 | 94ff882 | [260410-jty-implementar-lookup-de-webhook-por-botide](./quick/260410-jty-implementar-lookup-de-webhook-por-botide/) |
 
 ## Session Continuity
 
