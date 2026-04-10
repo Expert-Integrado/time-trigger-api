@@ -1760,6 +1760,373 @@ describe('RunDispatchService', () => {
     });
   });
 
+  describe('Webhook per-botIdentifier lookup — FUP in processDatabaseRuns', () => {
+    it('(WEBHOOK-BOT-FUP-01) FUP with botIdentifier dispatches to bot-specific Gerenciador follow up URL', async () => {
+      const fup = {
+        _id: 'fup-bot-01',
+        status: 'on',
+        nextInteractionTimestamp: 1000,
+        botIdentifier: 'bot-A',
+      };
+      const db = makeDb(withinWindowVars, webhooksDoc, [], [fup]);
+      (db as any)._collections.webhooks.findOne = jest
+        .fn()
+        .mockImplementation((filter: any) => {
+          if (filter?.botIdentifier === 'bot-A') {
+            return Promise.resolve({
+              botIdentifier: 'bot-A',
+              'Gerenciador follow up': 'https://bot-a-fup.example.com',
+            });
+          }
+          return Promise.resolve({
+            'Gerenciador follow up': 'https://fup.example.com',
+          });
+        });
+      mongoService.db.mockReturnValue(db as unknown as Db);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+      await service.runRunsCycle();
+
+      expect(webhookDispatchService.dispatchFup).toHaveBeenCalledWith(
+        expect.anything(),
+        fup,
+        'https://bot-a-fup.example.com',
+      );
+      jest.restoreAllMocks();
+    });
+
+    it('(WEBHOOK-BOT-FUP-02) FUP with botIdentifier falls back to generic URL when no bot-specific doc found', async () => {
+      const fup = {
+        _id: 'fup-bot-02',
+        status: 'on',
+        nextInteractionTimestamp: 1000,
+        botIdentifier: 'bot-B',
+      };
+      const db = makeDb(withinWindowVars, webhooksDoc, [], [fup]);
+      (db as any)._collections.webhooks.findOne = jest
+        .fn()
+        .mockImplementation((filter: any) => {
+          if (filter?.botIdentifier === 'bot-B') {
+            return Promise.resolve(null);
+          }
+          return Promise.resolve({
+            'Gerenciador follow up': 'https://fup.example.com',
+          });
+        });
+      mongoService.db.mockReturnValue(db as unknown as Db);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+      await service.runRunsCycle();
+
+      expect(webhookDispatchService.dispatchFup).toHaveBeenCalledWith(
+        expect.anything(),
+        fup,
+        'https://fup.example.com',
+      );
+      jest.restoreAllMocks();
+    });
+
+    it('(WEBHOOK-BOT-FUP-03) FUP with botIdentifier falls back to generic URL when bot-specific doc lacks Gerenciador follow up key', async () => {
+      const fup = {
+        _id: 'fup-bot-03',
+        status: 'on',
+        nextInteractionTimestamp: 1000,
+        botIdentifier: 'bot-C',
+      };
+      const db = makeDb(withinWindowVars, webhooksDoc, [], [fup]);
+      (db as any)._collections.webhooks.findOne = jest
+        .fn()
+        .mockImplementation((filter: any) => {
+          if (filter?.botIdentifier === 'bot-C') {
+            return Promise.resolve({
+              botIdentifier: 'bot-C',
+              'Processador de Runs': 'https://some-url.com',
+            });
+          }
+          return Promise.resolve({
+            'Gerenciador follow up': 'https://fup.example.com',
+          });
+        });
+      mongoService.db.mockReturnValue(db as unknown as Db);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+      await service.runRunsCycle();
+
+      expect(webhookDispatchService.dispatchFup).toHaveBeenCalledWith(
+        expect.anything(),
+        fup,
+        'https://fup.example.com',
+      );
+      jest.restoreAllMocks();
+    });
+
+    it('(WEBHOOK-BOT-FUP-04) FUP without botIdentifier uses generic URL and does NOT do per-bot lookup', async () => {
+      const fup = {
+        _id: 'fup-bot-04',
+        status: 'on',
+        nextInteractionTimestamp: 1000,
+        // no botIdentifier
+      };
+      const db = makeDb(withinWindowVars, webhooksDoc, [], [fup]);
+      const webhooksFindOne = (db as any)._collections.webhooks
+        .findOne as jest.Mock;
+      mongoService.db.mockReturnValue(db as unknown as Db);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+      await service.runRunsCycle();
+
+      expect(webhooksFindOne).toHaveBeenCalledTimes(1);
+      expect(webhooksFindOne).toHaveBeenCalledWith({});
+      expect(webhookDispatchService.dispatchFup).toHaveBeenCalledWith(
+        expect.anything(),
+        fup,
+        'https://fup.example.com',
+      );
+      jest.restoreAllMocks();
+    });
+  });
+
+  describe('Webhook per-botIdentifier lookup — FUP in processDatabaseFup (standalone cycle)', () => {
+    it('(WEBHOOK-BOT-FUP-STANDALONE-01) FUP with botIdentifier dispatches to bot-specific URL in runFupCycle', async () => {
+      const fup = {
+        _id: 'fup-standalone-01',
+        status: 'on',
+        nextInteractionTimestamp: 1000,
+        botIdentifier: 'bot-A',
+      };
+      const db = makeDb(withinWindowVars, webhooksDoc, [], [fup]);
+      (db as any)._collections.webhooks.findOne = jest
+        .fn()
+        .mockImplementation((filter: any) => {
+          if (filter?.botIdentifier === 'bot-A') {
+            return Promise.resolve({
+              botIdentifier: 'bot-A',
+              'Gerenciador follow up': 'https://bot-a-fup.example.com',
+            });
+          }
+          return Promise.resolve({
+            'Gerenciador follow up': 'https://fup.example.com',
+          });
+        });
+      mongoService.db.mockReturnValue(db as unknown as Db);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+      await service.runFupCycle();
+
+      expect(webhookDispatchService.dispatchFup).toHaveBeenCalledWith(
+        expect.anything(),
+        fup,
+        'https://bot-a-fup.example.com',
+      );
+      jest.restoreAllMocks();
+    });
+
+    it('(WEBHOOK-BOT-FUP-STANDALONE-02) FUP with botIdentifier falls back to generic when no bot-specific doc found in runFupCycle', async () => {
+      const fup = {
+        _id: 'fup-standalone-02',
+        status: 'on',
+        nextInteractionTimestamp: 1000,
+        botIdentifier: 'bot-B',
+      };
+      const db = makeDb(withinWindowVars, webhooksDoc, [], [fup]);
+      (db as any)._collections.webhooks.findOne = jest
+        .fn()
+        .mockImplementation((filter: any) => {
+          if (filter?.botIdentifier === 'bot-B') {
+            return Promise.resolve(null);
+          }
+          return Promise.resolve({
+            'Gerenciador follow up': 'https://fup.example.com',
+          });
+        });
+      mongoService.db.mockReturnValue(db as unknown as Db);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+      await service.runFupCycle();
+
+      expect(webhookDispatchService.dispatchFup).toHaveBeenCalledWith(
+        expect.anything(),
+        fup,
+        'https://fup.example.com',
+      );
+      jest.restoreAllMocks();
+    });
+
+    it('(WEBHOOK-BOT-FUP-STANDALONE-03) FUP without botIdentifier uses generic URL in runFupCycle', async () => {
+      const fup = {
+        _id: 'fup-standalone-03',
+        status: 'on',
+        nextInteractionTimestamp: 1000,
+        // no botIdentifier
+      };
+      const db = makeDb(withinWindowVars, webhooksDoc, [], [fup]);
+      const webhooksFindOne = (db as any)._collections.webhooks
+        .findOne as jest.Mock;
+      mongoService.db.mockReturnValue(db as unknown as Db);
+      jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+      jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+      await service.runFupCycle();
+
+      expect(webhooksFindOne).toHaveBeenCalledTimes(1);
+      expect(webhooksFindOne).toHaveBeenCalledWith({});
+      expect(webhookDispatchService.dispatchFup).toHaveBeenCalledWith(
+        expect.anything(),
+        fup,
+        'https://fup.example.com',
+      );
+      jest.restoreAllMocks();
+    });
+  });
+
+  describe('Webhook per-botIdentifier lookup — Messages', () => {
+    it('(WEBHOOK-BOT-MSG-01) message with botIdentifier dispatches to bot-specific mensagens pendentes URL', async () => {
+      const message = {
+        _id: 'msg-bot-01',
+        messageStatus: 'pending',
+        botIdentifier: 'bot-A',
+      };
+      const db = makeDb(
+        withinWindowVars,
+        webhooksDocWithMessages,
+        [],
+        [],
+        [message],
+      );
+      (db as any)._collections.webhooks.findOne = jest
+        .fn()
+        .mockImplementation((filter: any) => {
+          if (filter?.botIdentifier === 'bot-A') {
+            return Promise.resolve({
+              botIdentifier: 'bot-A',
+              'mensagens pendentes': 'https://bot-a-messages.example.com',
+            });
+          }
+          return Promise.resolve({
+            'mensagens pendentes': 'https://messages.example.com',
+          });
+        });
+      mongoService.db.mockReturnValue(db as unknown as Db);
+
+      await service.runMessagesCycle();
+
+      expect(webhookDispatchService.dispatchMessage).toHaveBeenCalledWith(
+        expect.anything(),
+        message,
+        'https://bot-a-messages.example.com',
+      );
+      jest.restoreAllMocks();
+    });
+
+    it('(WEBHOOK-BOT-MSG-02) message with botIdentifier falls back to generic URL when no bot-specific doc found', async () => {
+      const message = {
+        _id: 'msg-bot-02',
+        messageStatus: 'pending',
+        botIdentifier: 'bot-B',
+      };
+      const db = makeDb(
+        withinWindowVars,
+        webhooksDocWithMessages,
+        [],
+        [],
+        [message],
+      );
+      (db as any)._collections.webhooks.findOne = jest
+        .fn()
+        .mockImplementation((filter: any) => {
+          if (filter?.botIdentifier === 'bot-B') {
+            return Promise.resolve(null);
+          }
+          return Promise.resolve({
+            'mensagens pendentes': 'https://messages.example.com',
+          });
+        });
+      mongoService.db.mockReturnValue(db as unknown as Db);
+
+      await service.runMessagesCycle();
+
+      expect(webhookDispatchService.dispatchMessage).toHaveBeenCalledWith(
+        expect.anything(),
+        message,
+        'https://messages.example.com',
+      );
+      jest.restoreAllMocks();
+    });
+
+    it('(WEBHOOK-BOT-MSG-03) message with botIdentifier falls back to generic URL when bot-specific doc lacks mensagens pendentes key', async () => {
+      const message = {
+        _id: 'msg-bot-03',
+        messageStatus: 'pending',
+        botIdentifier: 'bot-C',
+      };
+      const db = makeDb(
+        withinWindowVars,
+        webhooksDocWithMessages,
+        [],
+        [],
+        [message],
+      );
+      (db as any)._collections.webhooks.findOne = jest
+        .fn()
+        .mockImplementation((filter: any) => {
+          if (filter?.botIdentifier === 'bot-C') {
+            return Promise.resolve({
+              botIdentifier: 'bot-C',
+              'Processador de Runs': 'https://some-url.com',
+            });
+          }
+          return Promise.resolve({
+            'mensagens pendentes': 'https://messages.example.com',
+          });
+        });
+      mongoService.db.mockReturnValue(db as unknown as Db);
+
+      await service.runMessagesCycle();
+
+      expect(webhookDispatchService.dispatchMessage).toHaveBeenCalledWith(
+        expect.anything(),
+        message,
+        'https://messages.example.com',
+      );
+      jest.restoreAllMocks();
+    });
+
+    it('(WEBHOOK-BOT-MSG-04) message without botIdentifier uses generic URL and does NOT do per-bot lookup', async () => {
+      const message = {
+        _id: 'msg-bot-04',
+        messageStatus: 'pending',
+        // no botIdentifier
+      };
+      const db = makeDb(
+        withinWindowVars,
+        webhooksDocWithMessages,
+        [],
+        [],
+        [message],
+      );
+      const webhooksFindOne = (db as any)._collections.webhooks
+        .findOne as jest.Mock;
+      mongoService.db.mockReturnValue(db as unknown as Db);
+
+      await service.runMessagesCycle();
+
+      expect(webhooksFindOne).toHaveBeenCalledTimes(1);
+      expect(webhooksFindOne).toHaveBeenCalledWith({});
+      expect(webhookDispatchService.dispatchMessage).toHaveBeenCalledWith(
+        expect.anything(),
+        message,
+        'https://messages.example.com',
+      );
+      jest.restoreAllMocks();
+    });
+  });
+
   describe('Message-Run Dependency (DEP-02, DEP-03, DEP-04, DEP-05)', () => {
     it('(DEP-02/DEP-03) skips run when processing message exists for same botIdentifier+chatDataId', async () => {
       const run = {
