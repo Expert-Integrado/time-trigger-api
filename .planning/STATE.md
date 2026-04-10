@@ -101,9 +101,10 @@ None.
 | 260406-iim | Separar timeTrigger.enabled em enabledRuns e enabledFups para controle independente de cada fluxo | 2026-04-06 | 939aab7 | [260406-iim-separar-timetrigger-enabled-em-enabledru](./quick/260406-iim-separar-timetrigger-enabled-em-enabledru/) |
 | 260410-jty | Implementar lookup de webhook por botIdentifier | 2026-04-10 | 94ff882 | [260410-jty-implementar-lookup-de-webhook-por-botide](./quick/260410-jty-implementar-lookup-de-webhook-por-botide/) |
 | 260410-k36 | Estender lookup de webhook por botIdentifier para FUPs e messages | 2026-04-10 | 640b213 | [260410-k36-estender-lookup-de-webhook-por-botidenti](./quick/260410-k36-estender-lookup-de-webhook-por-botidenti/) |
+| 260410-kbl | Corrigir guard externo de webhook URL que impedia dispatch em DBs multi-bot | 2026-04-10 | cceaf06 | [260410-kbl-corrigir-guard-externo-de-webhook-url-qu](./quick/260410-kbl-corrigir-guard-externo-de-webhook-url-qu/) |
 
 ## Session Continuity
 
-Last session: 2026-03-30T13:33:42.645Z
-Stopped at: Completed 10-02-PLAN.md
+Last session: 2026-04-10T14:43:00Z
+Stopped at: Completed quick task 260410-kbl
 Resume file: None
