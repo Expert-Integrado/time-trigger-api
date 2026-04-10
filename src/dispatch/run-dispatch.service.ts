@@ -251,55 +251,55 @@ export class RunDispatchService {
           `[${dbName}] "Processador de Runs" URL missing from webhooks — skipping`,
         );
       } else {
-      // DETECT-01: find waiting runs with waitUntil in the past
-      const runs: Document[] = await db
-        .collection('runs')
-        .find({ runStatus: 'waiting', waitUntil: { $lte: Date.now() } })
-        .toArray();
+        // DETECT-01: find waiting runs with waitUntil in the past
+        const runs: Document[] = await db
+          .collection('runs')
+          .find({ runStatus: 'waiting', waitUntil: { $lte: Date.now() } })
+          .toArray();
 
-      for (const run of runs) {
-        if (counterRuns >= this.rateLimitRuns) {
-          this.logger.warn(
-            `[${dbName}] Rate limit reached for runs (${counterRuns}/${this.rateLimitRuns}) — skipping remaining items`,
-          );
-          break;
-        }
-        // DEP-02, DEP-03, DEP-04, DEP-05: dependency guard — block run if matching message is processing
-        const botIdentifier = run['botIdentifier'] as string | undefined;
-        const chatDataId = run['chatDataId'] as string | undefined;
-        if (botIdentifier && chatDataId) {
-          const blocked = await this.messageCheckService.hasProcessingMessage(
-            db,
-            botIdentifier,
-            chatDataId,
-          );
-          if (blocked) {
+        for (const run of runs) {
+          if (counterRuns >= this.rateLimitRuns) {
             this.logger.warn(
-              `[${dbName}] Run ${String(run['_id'])} blocked — message still processing (chatDataId: ${chatDataId}, botIdentifier: ${botIdentifier})`,
+              `[${dbName}] Rate limit reached for runs (${counterRuns}/${this.rateLimitRuns}) — skipping remaining items`,
             );
-            continue;
+            break;
+          }
+          // DEP-02, DEP-03, DEP-04, DEP-05: dependency guard — block run if matching message is processing
+          const botIdentifier = run['botIdentifier'] as string | undefined;
+          const chatDataId = run['chatDataId'] as string | undefined;
+          if (botIdentifier && chatDataId) {
+            const blocked = await this.messageCheckService.hasProcessingMessage(
+              db,
+              botIdentifier,
+              chatDataId,
+            );
+            if (blocked) {
+              this.logger.warn(
+                `[${dbName}] Run ${String(run['_id'])} blocked — message still processing (chatDataId: ${chatDataId}, botIdentifier: ${botIdentifier})`,
+              );
+              continue;
+            }
+          }
+          // Resolve per-run webhook URL: bot-specific takes priority over generic
+          let runWebhookUrl = webhookUrl; // default to generic
+          if (botIdentifier) {
+            const botWebhookDoc = await db
+              .collection('webhooks')
+              .findOne<WebhookDoc>({ botIdentifier });
+            const botSpecificUrl = botWebhookDoc?.['Processador de Runs'];
+            if (botSpecificUrl) {
+              runWebhookUrl = botSpecificUrl;
+            }
+          }
+          const claimed = await this.webhookDispatchService.dispatch(
+            db,
+            run,
+            runWebhookUrl,
+          );
+          if (claimed) {
+            counterRuns++;
           }
         }
-        // Resolve per-run webhook URL: bot-specific takes priority over generic
-        let runWebhookUrl = webhookUrl; // default to generic
-        if (botIdentifier) {
-          const botWebhookDoc = await db
-            .collection('webhooks')
-            .findOne<WebhookDoc>({ botIdentifier });
-          const botSpecificUrl = botWebhookDoc?.['Processador de Runs'];
-          if (botSpecificUrl) {
-            runWebhookUrl = botSpecificUrl;
-          }
-        }
-        const claimed = await this.webhookDispatchService.dispatch(
-          db,
-          run,
-          runWebhookUrl,
-        );
-        if (claimed) {
-          counterRuns++;
-        }
-      }
       }
     }
 
@@ -318,44 +318,44 @@ export class RunDispatchService {
           `[${dbName}] "Gerenciador follow up" URL missing from webhooks — skipping FUP dispatch`,
         );
       } else {
-      const fups: Document[] = await db
-        .collection('fup')
-        .find({
-          status: 'on',
-          nextInteractionTimestamp: { $lte: Date.now() },
-        })
-        .toArray();
+        const fups: Document[] = await db
+          .collection('fup')
+          .find({
+            status: 'on',
+            nextInteractionTimestamp: { $lte: Date.now() },
+          })
+          .toArray();
 
-      for (const fup of fups) {
-        if (counterFup >= this.rateLimitFup) {
-          this.logger.warn(
-            `[${dbName}] Rate limit reached for FUP (${counterFup}/${this.rateLimitFup}) — skipping remaining items`,
+        for (const fup of fups) {
+          if (counterFup >= this.rateLimitFup) {
+            this.logger.warn(
+              `[${dbName}] Rate limit reached for FUP (${counterFup}/${this.rateLimitFup}) — skipping remaining items`,
+            );
+            break;
+          }
+          // FUP-09: dispatch each eligible FUP with bot-specific URL resolution
+          const fupBotIdentifier = fup['botIdentifier'] as string | undefined;
+          let resolvedFupUrl = fupWebhookUrl;
+          if (fupBotIdentifier) {
+            const botWebhookDoc = await db
+              .collection('webhooks')
+              .findOne<WebhookDoc>({ botIdentifier: fupBotIdentifier });
+            const botSpecificUrl = botWebhookDoc?.['Gerenciador follow up'] as
+              | string
+              | undefined;
+            if (botSpecificUrl) {
+              resolvedFupUrl = botSpecificUrl;
+            }
+          }
+          const claimed = await this.webhookDispatchService.dispatchFup(
+            db,
+            fup,
+            resolvedFupUrl,
           );
-          break;
-        }
-        // FUP-09: dispatch each eligible FUP with bot-specific URL resolution
-        const fupBotIdentifier = fup['botIdentifier'] as string | undefined;
-        let resolvedFupUrl = fupWebhookUrl;
-        if (fupBotIdentifier) {
-          const botWebhookDoc = await db
-            .collection('webhooks')
-            .findOne<WebhookDoc>({ botIdentifier: fupBotIdentifier });
-          const botSpecificUrl = botWebhookDoc?.['Gerenciador follow up'] as
-            | string
-            | undefined;
-          if (botSpecificUrl) {
-            resolvedFupUrl = botSpecificUrl;
+          if (claimed) {
+            counterFup++;
           }
         }
-        const claimed = await this.webhookDispatchService.dispatchFup(
-          db,
-          fup,
-          resolvedFupUrl,
-        );
-        if (claimed) {
-          counterFup++;
-        }
-      }
       }
     }
 
