@@ -4,8 +4,8 @@ milestone: v1.5
 milestone_name: Rate Limiting and Message-Run Dependency
 status: executing
 stopped_at: Completed 10-02-PLAN.md
-last_updated: "2026-04-01T14:17:32.320Z"
-last_activity: 2026-04-06 - Completed quick task 260406-iim: Separar timeTrigger.enabled em enabledRuns e enabledFups para controle independente de cada fluxo
+last_updated: "2026-04-14T20:35:16Z"
+last_activity: 2026-04-14 - Completed quick task 260414-ob8: Alterar dispatchFup para claim-first pattern
 progress:
   total_phases: 3
   completed_phases: 3
@@ -102,9 +102,10 @@ None.
 | 260410-jty | Implementar lookup de webhook por botIdentifier | 2026-04-10 | 94ff882 | [260410-jty-implementar-lookup-de-webhook-por-botide](./quick/260410-jty-implementar-lookup-de-webhook-por-botide/) |
 | 260410-k36 | Estender lookup de webhook por botIdentifier para FUPs e messages | 2026-04-10 | 640b213 | [260410-k36-estender-lookup-de-webhook-por-botidenti](./quick/260410-k36-estender-lookup-de-webhook-por-botidenti/) |
 | 260410-kbl | Corrigir guard externo de webhook URL que impedia dispatch em DBs multi-bot | 2026-04-10 | cceaf06 | [260410-kbl-corrigir-guard-externo-de-webhook-url-qu](./quick/260410-kbl-corrigir-guard-externo-de-webhook-url-qu/) |
+| 260414-ob8 | Alterar dispatchFup para claim-first pattern | 2026-04-14 | 6312550 | [260414-ob8-alterar-dispatchfup-para-claim-first-pat](./quick/260414-ob8-alterar-dispatchfup-para-claim-first-pat/) |
 
 ## Session Continuity
 
-Last session: 2026-04-10T14:43:00Z
-Stopped at: Completed quick task 260410-kbl
+Last session: 2026-04-14T20:35:16Z
+Stopped at: Completed quick task 260414-ob8
 Resume file: None
