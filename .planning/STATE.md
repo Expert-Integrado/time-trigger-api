@@ -103,9 +103,10 @@ None.
 | 260410-k36 | Estender lookup de webhook por botIdentifier para FUPs e messages | 2026-04-10 | 640b213 | [260410-k36-estender-lookup-de-webhook-por-botidenti](./quick/260410-k36-estender-lookup-de-webhook-por-botidenti/) |
 | 260410-kbl | Corrigir guard externo de webhook URL que impedia dispatch em DBs multi-bot | 2026-04-10 | cceaf06 | [260410-kbl-corrigir-guard-externo-de-webhook-url-qu](./quick/260410-kbl-corrigir-guard-externo-de-webhook-url-qu/) |
 | 260414-ob8 | Alterar dispatchFup para claim-first pattern | 2026-04-14 | 6312550 | [260414-ob8-alterar-dispatchfup-para-claim-first-pat](./quick/260414-ob8-alterar-dispatchfup-para-claim-first-pat/) |
+| 260414-onr | Aplicar claim-first para dispatch e dispatchMessage | 2026-04-14 | 3db0a65 | [260414-onr-aplicar-claim-first-para-dispatch-e-disp](./quick/260414-onr-aplicar-claim-first-para-dispatch-e-disp/) |
 
 ## Session Continuity
 
-Last session: 2026-04-14T20:35:16Z
-Stopped at: Completed quick task 260414-ob8
+Last session: 2026-04-14T20:56:00Z
+Stopped at: Completed quick task 260414-onr
 Resume file: None
