@@ -49,40 +49,67 @@ export class WebhookDispatchService {
     webhookUrl: string,
   ): Promise<boolean> {
     const fupId = fup['_id'] as ObjectId;
-    const success = await this.post(webhookUrl, fup);
 
-    if (success) {
-      const result = await db
-        .collection('fup')
-        .findOneAndUpdate(
-          { _id: fupId, status: 'on' },
-          { $set: { status: 'queued' } },
-        );
-      if (!result) {
-        this.logger.warn(
-          `FUP ${String(fupId)} already claimed by another cycle`,
-        );
-        return false;
-      }
-      return true;
+    // FUP-06: Claim first - atomically update status 'on' → 'queued' before POST
+    const claimResult = await db
+      .collection('fup')
+      .findOneAndUpdate(
+        { _id: fupId, status: 'on' },
+        { $set: { status: 'queued' } },
+      );
+
+    if (!claimResult) {
+      this.logger.warn(`FUP ${String(fupId)} already claimed by another cycle`);
+      return false;
     }
 
-    // FUP-07: single non-blocking retry after 60s
-    const retryFn = (): void => {
-      void this.post(webhookUrl, fup).then(async (retrySuccess) => {
-        if (retrySuccess) {
-          await db
+    // FUP-06: POST to webhook after successful claim
+    const success = await this.post(webhookUrl, fup);
+
+    if (!success) {
+      // FUP-06: Revert status 'queued' → 'on' on failed POST
+      await db
+        .collection('fup')
+        .findOneAndUpdate(
+          { _id: fupId, status: 'queued' },
+          { $set: { status: 'on' } },
+        );
+
+      // FUP-07: single non-blocking retry after 60s with claim-first pattern
+      const retryFn = (): void => {
+        void (async () => {
+          // FUP-06: Retry also uses claim-first pattern
+          const retryClaimResult = await db
             .collection('fup')
             .findOneAndUpdate(
               { _id: fupId, status: 'on' },
               { $set: { status: 'queued' } },
             );
-        }
-        // FUP-08: if retry fails, leave fup as 'on' — next cycle picks up
-      });
-    };
-    setTimeout(retryFn, 60_000);
-    return false;
+
+          if (!retryClaimResult) {
+            return;
+          }
+
+          const retrySuccess = await this.post(webhookUrl, fup);
+
+          if (!retrySuccess) {
+            // FUP-06: Revert retry claim on failure
+            await db
+              .collection('fup')
+              .findOneAndUpdate(
+                { _id: fupId, status: 'queued' },
+                { $set: { status: 'on' } },
+              );
+          }
+          // FUP-08: if retry succeeds, status stays 'queued' — webhook processes
+        })();
+      };
+      setTimeout(retryFn, 60_000);
+      return false;
+    }
+
+    // FUP-06: Success - status stays 'queued'
+    return true;
   }
 
   async dispatchMessage(
