@@ -269,16 +269,29 @@ describe('WebhookDispatchService - dispatchFup', () => {
     expect(updateArg.$set.queuedAt).toBeUndefined();
   });
 
-  it('(FUP-07) schedules retry via setTimeout(60000) when POST fails', async () => {
+  it('(FUP-07) claims first, reverts on POST failure, and schedules retry via setTimeout(60000)', async () => {
     fetchMock.mockResolvedValueOnce({ ok: false });
 
     await service.dispatchFup(mockFupDb as unknown as Db, fup, fupWebhookUrl);
 
     expect(setTimeout).toHaveBeenCalledWith(expect.any(Function), 60_000);
-    expect(mockFupCollection.findOneAndUpdate).not.toHaveBeenCalled();
+    // Claim-first pattern: 1 call to claim (on→queued), 1 call to revert (queued→on)
+    expect(mockFupCollection.findOneAndUpdate).toHaveBeenCalledTimes(2);
+    // First call: claim
+    expect(mockFupCollection.findOneAndUpdate).toHaveBeenNthCalledWith(
+      1,
+      { _id: fup._id, status: 'on' },
+      { $set: { status: 'queued' } },
+    );
+    // Second call: revert
+    expect(mockFupCollection.findOneAndUpdate).toHaveBeenNthCalledWith(
+      2,
+      { _id: fup._id, status: 'queued' },
+      { $set: { status: 'on' } },
+    );
   });
 
-  it('(FUP-08) retry calls findOneAndUpdate when retry POST succeeds', async () => {
+  it('(FUP-08) retry uses claim-first pattern and keeps status queued when retry POST succeeds', async () => {
     fetchMock
       .mockResolvedValueOnce({ ok: false }) // initial fails
       .mockResolvedValueOnce({ ok: true }); // retry succeeds
@@ -287,10 +300,15 @@ describe('WebhookDispatchService - dispatchFup', () => {
 
     await jest.runAllTimersAsync();
 
-    expect(mockFupCollection.findOneAndUpdate).toHaveBeenCalledTimes(1);
+    // Claim-first pattern:
+    // 1. Initial claim (on→queued)
+    // 2. Initial revert (queued→on) after POST fails
+    // 3. Retry claim (on→queued)
+    // (no revert needed since retry POST succeeds)
+    expect(mockFupCollection.findOneAndUpdate).toHaveBeenCalledTimes(3);
   });
 
-  it('(FUP-08) does NOT call findOneAndUpdate when retry also fails', async () => {
+  it('(FUP-08) reverts status when retry also fails (claim-first pattern)', async () => {
     fetchMock
       .mockResolvedValueOnce({ ok: false }) // initial fails
       .mockResolvedValueOnce({ ok: false }); // retry also fails
@@ -298,7 +316,12 @@ describe('WebhookDispatchService - dispatchFup', () => {
     await service.dispatchFup(mockFupDb as unknown as Db, fup, fupWebhookUrl);
     await jest.runAllTimersAsync();
 
-    expect(mockFupCollection.findOneAndUpdate).not.toHaveBeenCalled();
+    // Claim-first pattern:
+    // 1. Initial claim (on→queued)
+    // 2. Initial revert (queued→on) after POST fails
+    // 3. Retry claim (on→queued)
+    // 4. Retry revert (queued→on) after retry POST fails
+    expect(mockFupCollection.findOneAndUpdate).toHaveBeenCalledTimes(4);
   });
 
   it('fetch throw treats as failure (schedules retry, does not propagate)', async () => {
