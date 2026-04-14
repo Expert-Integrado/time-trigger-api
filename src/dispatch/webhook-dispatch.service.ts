@@ -147,46 +147,79 @@ export class WebhookDispatchService {
     webhookUrl: string,
   ): Promise<boolean> {
     const messageId = message['_id'] as ObjectId;
-    const success = await this.post(webhookUrl, message);
 
-    if (success) {
-      const result = await db.collection('messages').findOneAndUpdate(
-        { _id: messageId, messageStatus: 'pending' },
-        {
-          $set: {
-            messageStatus: 'processing',
-            processingStartedAt: new Date(),
-          },
+    // MSG-05: Claim first - atomically update messageStatus 'pending' → 'processing' before POST
+    const claimResult = await db.collection('messages').findOneAndUpdate(
+      { _id: messageId, messageStatus: 'pending' },
+      {
+        $set: {
+          messageStatus: 'processing',
+          processingStartedAt: new Date(),
         },
+      },
+    );
+
+    if (!claimResult) {
+      this.logger.warn(
+        `Message ${String(messageId)} already claimed by another cycle`,
       );
-      if (!result) {
-        this.logger.warn(
-          `Message ${String(messageId)} already claimed by another cycle`,
-        );
-        return false;
-      }
-      return true;
+      return false;
     }
 
-    // MSG-07: single non-blocking retry after 60s
-    const retryFn = (): void => {
-      void this.post(webhookUrl, message).then(async (retrySuccess) => {
-        if (retrySuccess) {
-          await db.collection('messages').findOneAndUpdate(
-            { _id: messageId, messageStatus: 'pending' },
-            {
-              $set: {
-                messageStatus: 'processing',
-                processingStartedAt: new Date(),
+    // MSG-05: POST to webhook after successful claim
+    const success = await this.post(webhookUrl, message);
+
+    if (!success) {
+      // MSG-05: Revert status 'processing' → 'pending' on failed POST
+      await db.collection('messages').findOneAndUpdate(
+        { _id: messageId, messageStatus: 'processing' },
+        {
+          $set: { messageStatus: 'pending' },
+          $unset: { processingStartedAt: '' },
+        },
+      );
+
+      // MSG-07: single non-blocking retry after 60s with claim-first pattern
+      const retryFn = (): void => {
+        void (async () => {
+          // MSG-05: Retry also uses claim-first pattern
+          const retryClaimResult = await db
+            .collection('messages')
+            .findOneAndUpdate(
+              { _id: messageId, messageStatus: 'pending' },
+              {
+                $set: {
+                  messageStatus: 'processing',
+                  processingStartedAt: new Date(),
+                },
               },
-            },
-          );
-        }
-        // MSG-08: if retry fails, leave message as 'pending' — next cycle picks up
-      });
-    };
-    setTimeout(retryFn, 60_000);
-    return false;
+            );
+
+          if (!retryClaimResult) {
+            return;
+          }
+
+          const retrySuccess = await this.post(webhookUrl, message);
+
+          if (!retrySuccess) {
+            // MSG-05: Revert retry claim on failure
+            await db.collection('messages').findOneAndUpdate(
+              { _id: messageId, messageStatus: 'processing' },
+              {
+                $set: { messageStatus: 'pending' },
+                $unset: { processingStartedAt: '' },
+              },
+            );
+          }
+          // MSG-08: if retry succeeds, status stays 'processing' — webhook processes
+        })();
+      };
+      setTimeout(retryFn, 60_000);
+      return false;
+    }
+
+    // MSG-05: Success - status stays 'processing'
+    return true;
   }
 
   private async post(url: string, run: Document): Promise<boolean> {

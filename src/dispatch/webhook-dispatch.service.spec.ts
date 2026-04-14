@@ -457,7 +457,7 @@ describe('WebhookDispatchService - dispatchMessage', () => {
     expect(callOptions.signal).toBeDefined();
   });
 
-  it('(MSG-05) calls findOneAndUpdate on messages collection when POST succeeds', async () => {
+  it('(MSG-05) calls findOneAndUpdate before POST (claim-first pattern)', async () => {
     fetchMock.mockResolvedValueOnce({ ok: true });
 
     await service.dispatchMessage(
@@ -467,6 +467,7 @@ describe('WebhookDispatchService - dispatchMessage', () => {
     );
 
     expect(mockMsgDb.collection).toHaveBeenCalledWith('messages');
+    // Claim-first pattern: 1 call to claim (pending→processing), no revert needed on success
     expect(mockMsgCollection.findOneAndUpdate).toHaveBeenCalledTimes(1);
   });
 
@@ -499,7 +500,7 @@ describe('WebhookDispatchService - dispatchMessage', () => {
     expect(updateArg.$set.messageStatus).toBe('processing');
   });
 
-  it('(MSG-07) schedules retry via setTimeout(60000) when POST fails', async () => {
+  it('(MSG-07) claims first, reverts on POST failure, and schedules retry via setTimeout(60000)', async () => {
     fetchMock.mockResolvedValueOnce({ ok: false });
 
     await service.dispatchMessage(
@@ -509,10 +510,31 @@ describe('WebhookDispatchService - dispatchMessage', () => {
     );
 
     expect(setTimeout).toHaveBeenCalledWith(expect.any(Function), 60_000);
-    expect(mockMsgCollection.findOneAndUpdate).not.toHaveBeenCalled();
+    // Claim-first pattern: 1 call to claim (pending→processing), 1 call to revert (processing→pending)
+    expect(mockMsgCollection.findOneAndUpdate).toHaveBeenCalledTimes(2);
+    // First call: claim
+    expect(mockMsgCollection.findOneAndUpdate).toHaveBeenNthCalledWith(
+      1,
+      { _id: message._id, messageStatus: 'pending' },
+      {
+        $set: {
+          messageStatus: 'processing',
+          processingStartedAt: expect.any(Date),
+        },
+      },
+    );
+    // Second call: revert
+    expect(mockMsgCollection.findOneAndUpdate).toHaveBeenNthCalledWith(
+      2,
+      { _id: message._id, messageStatus: 'processing' },
+      {
+        $set: { messageStatus: 'pending' },
+        $unset: { processingStartedAt: '' },
+      },
+    );
   });
 
-  it('(MSG-07) retry calls findOneAndUpdate when retry POST succeeds', async () => {
+  it('(MSG-07) retry uses claim-first pattern and keeps status processing when retry POST succeeds', async () => {
     fetchMock
       .mockResolvedValueOnce({ ok: false }) // initial fails
       .mockResolvedValueOnce({ ok: true }); // retry succeeds
@@ -525,10 +547,15 @@ describe('WebhookDispatchService - dispatchMessage', () => {
 
     await jest.runAllTimersAsync();
 
-    expect(mockMsgCollection.findOneAndUpdate).toHaveBeenCalledTimes(1);
+    // Claim-first pattern:
+    // 1. Initial claim (pending→processing)
+    // 2. Initial revert (processing→pending) after POST fails
+    // 3. Retry claim (pending→processing)
+    // (no revert needed since retry POST succeeds)
+    expect(mockMsgCollection.findOneAndUpdate).toHaveBeenCalledTimes(3);
   });
 
-  it('(MSG-08) does NOT call findOneAndUpdate when retry also fails', async () => {
+  it('(MSG-08) reverts status when retry also fails (claim-first pattern)', async () => {
     fetchMock
       .mockResolvedValueOnce({ ok: false }) // initial fails
       .mockResolvedValueOnce({ ok: false }); // retry also fails
@@ -540,7 +567,12 @@ describe('WebhookDispatchService - dispatchMessage', () => {
     );
     await jest.runAllTimersAsync();
 
-    expect(mockMsgCollection.findOneAndUpdate).not.toHaveBeenCalled();
+    // Claim-first pattern:
+    // 1. Initial claim (pending→processing)
+    // 2. Initial revert (processing→pending) after POST fails
+    // 3. Retry claim (pending→processing)
+    // 4. Retry revert (processing→pending) after retry POST fails
+    expect(mockMsgCollection.findOneAndUpdate).toHaveBeenCalledTimes(4);
   });
 
   it('fetch throw treated as failure (schedules retry, does not propagate)', async () => {
