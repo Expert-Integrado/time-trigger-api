@@ -7,40 +7,69 @@ export class WebhookDispatchService {
 
   async dispatch(db: Db, run: Document, webhookUrl: string): Promise<boolean> {
     const runId = run['_id'] as ObjectId;
-    const success = await this.post(webhookUrl, run);
 
-    if (success) {
-      const result = await db
-        .collection('runs')
-        .findOneAndUpdate(
-          { _id: runId, runStatus: 'waiting' },
-          { $set: { runStatus: 'queued', queuedAt: new Date() } },
-        );
-      if (!result) {
-        this.logger.warn(
-          `Run ${String(runId)} already claimed by another cycle`,
-        );
-        return false;
-      }
-      return true;
+    // DISP-02: Claim first - atomically update runStatus 'waiting' → 'queued' before POST
+    const claimResult = await db
+      .collection('runs')
+      .findOneAndUpdate(
+        { _id: runId, runStatus: 'waiting' },
+        { $set: { runStatus: 'queued', queuedAt: new Date() } },
+      );
+
+    if (!claimResult) {
+      this.logger.warn(
+        `Run ${String(runId)} already claimed by another cycle`,
+      );
+      return false;
     }
 
-    // DISP-04: single non-blocking retry after 60s
-    const retryFn = (): void => {
-      void this.post(webhookUrl, run).then(async (retrySuccess) => {
-        if (retrySuccess) {
-          await db
+    // DISP-02: POST to webhook after successful claim
+    const success = await this.post(webhookUrl, run);
+
+    if (!success) {
+      // DISP-02: Revert status 'queued' → 'waiting' on failed POST
+      await db
+        .collection('runs')
+        .findOneAndUpdate(
+          { _id: runId, runStatus: 'queued' },
+          { $set: { runStatus: 'waiting' }, $unset: { queuedAt: '' } },
+        );
+
+      // DISP-04: single non-blocking retry after 60s with claim-first pattern
+      const retryFn = (): void => {
+        void (async () => {
+          // DISP-02: Retry also uses claim-first pattern
+          const retryClaimResult = await db
             .collection('runs')
             .findOneAndUpdate(
               { _id: runId, runStatus: 'waiting' },
               { $set: { runStatus: 'queued', queuedAt: new Date() } },
             );
-        }
-        // DISP-05: if retry fails, leave run as 'waiting' — next cycle picks up
-      });
-    };
-    setTimeout(retryFn, 60_000);
-    return false;
+
+          if (!retryClaimResult) {
+            return;
+          }
+
+          const retrySuccess = await this.post(webhookUrl, run);
+
+          if (!retrySuccess) {
+            // DISP-02: Revert retry claim on failure
+            await db
+              .collection('runs')
+              .findOneAndUpdate(
+                { _id: runId, runStatus: 'queued' },
+                { $set: { runStatus: 'waiting' }, $unset: { queuedAt: '' } },
+              );
+          }
+          // DISP-05: if retry succeeds, status stays 'queued' — webhook processes
+        })();
+      };
+      setTimeout(retryFn, 60_000);
+      return false;
+    }
+
+    // DISP-02: Success - status stays 'queued'
+    return true;
   }
 
   async dispatchFup(
