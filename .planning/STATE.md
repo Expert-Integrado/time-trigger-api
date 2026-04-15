@@ -4,8 +4,8 @@ milestone: v1.5
 milestone_name: Rate Limiting and Message-Run Dependency
 status: executing
 stopped_at: Completed 10-02-PLAN.md
-last_updated: "2026-04-14T20:35:16Z"
-last_activity: 2026-04-14 - Completed quick task 260414-ob8: Alterar dispatchFup para claim-first pattern
+last_updated: "2026-04-15T12:34:10Z"
+last_activity: 2026-04-15 - Completed quick task 260415-dah: Adicionar RATE_LIMIT_RUNS=20, RATE_LIMIT_FUP=20 e RATE_LIMIT_MESSAGES=20 no .env
 progress:
   total_phases: 3
   completed_phases: 3
@@ -104,6 +104,7 @@ None.
 | 260410-kbl | Corrigir guard externo de webhook URL que impedia dispatch em DBs multi-bot | 2026-04-10 | cceaf06 | [260410-kbl-corrigir-guard-externo-de-webhook-url-qu](./quick/260410-kbl-corrigir-guard-externo-de-webhook-url-qu/) |
 | 260414-ob8 | Alterar dispatchFup para claim-first pattern | 2026-04-14 | 6312550 | [260414-ob8-alterar-dispatchfup-para-claim-first-pat](./quick/260414-ob8-alterar-dispatchfup-para-claim-first-pat/) |
 | 260414-onr | Aplicar claim-first para dispatch e dispatchMessage | 2026-04-14 | 3db0a65 | [260414-onr-aplicar-claim-first-para-dispatch-e-disp](./quick/260414-onr-aplicar-claim-first-para-dispatch-e-disp/) |
+| 260415-dah | Adicionar RATE_LIMIT_RUNS=20, RATE_LIMIT_FUP=20 e RATE_LIMIT_MESSAGES=20 no .env | 2026-04-15 | - | [260415-dah-adicionar-rate-limit-runs-20-rate-limit-](./quick/260415-dah-adicionar-rate-limit-runs-20-rate-limit-/) |
 
 ## Session Continuity
 
