@@ -17,9 +17,7 @@ export class WebhookDispatchService {
       );
 
     if (!claimResult) {
-      this.logger.warn(
-        `Run ${String(runId)} already claimed by another cycle`,
-      );
+      this.logger.warn(`Run ${String(runId)} already claimed by another cycle`);
       return false;
     }
 
