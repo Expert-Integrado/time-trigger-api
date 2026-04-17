@@ -5,7 +5,7 @@ milestone_name: Rate Limiting and Message-Run Dependency
 status: executing
 stopped_at: Completed 10-02-PLAN.md
 last_updated: "2026-04-15T12:34:10Z"
-last_activity: 2026-04-15 - Completed quick task 260415-dah: Adicionar RATE_LIMIT_RUNS=20, RATE_LIMIT_FUP=20 e RATE_LIMIT_MESSAGES=20 no .env
+last_activity: 2026-04-17 - Completed quick task 260417-peb: Adicionar .sort({ createdAt: 1 }) na query de runs para processar na ordem de criação
 progress:
   total_phases: 3
   completed_phases: 3
@@ -105,6 +105,7 @@ None.
 | 260414-ob8 | Alterar dispatchFup para claim-first pattern | 2026-04-14 | 6312550 | [260414-ob8-alterar-dispatchfup-para-claim-first-pat](./quick/260414-ob8-alterar-dispatchfup-para-claim-first-pat/) |
 | 260414-onr | Aplicar claim-first para dispatch e dispatchMessage | 2026-04-14 | 3db0a65 | [260414-onr-aplicar-claim-first-para-dispatch-e-disp](./quick/260414-onr-aplicar-claim-first-para-dispatch-e-disp/) |
 | 260415-dah | Adicionar RATE_LIMIT_RUNS=20, RATE_LIMIT_FUP=20 e RATE_LIMIT_MESSAGES=20 no .env | 2026-04-15 | - | [260415-dah-adicionar-rate-limit-runs-20-rate-limit-](./quick/260415-dah-adicionar-rate-limit-runs-20-rate-limit-/) |
+| 260417-peb | Adicionar .sort({ createdAt: 1 }) na query de runs para processar na ordem de criação | 2026-04-17 | dce030f | [260417-peb-adicionar-sort-createdat-1-na-query-de-r](./quick/260417-peb-adicionar-sort-createdat-1-na-query-de-r/) |
 
 ## Session Continuity
 
