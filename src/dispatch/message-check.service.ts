@@ -11,7 +11,7 @@ export class MessageCheckService {
     const doc = await db.collection('messages').findOne({
       botIdentifier,
       chatDataId,
-      messageStatus: 'processing',
+      messageStatus: { $ne: 'done' },
     });
     return doc !== null;
   }
