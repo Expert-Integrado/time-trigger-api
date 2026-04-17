@@ -18,7 +18,7 @@ describe('MessageCheckService', () => {
     service = module.get<MessageCheckService>(MessageCheckService);
   });
 
-  it('returns true when a processing message exists (DEP-02)', async () => {
+  it('returns true when a non-done message exists', async () => {
     mockCollection.findOne.mockResolvedValue({ _id: 'msg-1' });
     const result = await service.hasProcessingMessage(
       mockDb as unknown as Db,
@@ -28,7 +28,7 @@ describe('MessageCheckService', () => {
     expect(result).toBe(true);
   });
 
-  it('returns false when no processing message exists (DEP-05)', async () => {
+  it('returns false when no non-done message exists', async () => {
     mockCollection.findOne.mockResolvedValue(null);
     const result = await service.hasProcessingMessage(
       mockDb as unknown as Db,
@@ -38,7 +38,7 @@ describe('MessageCheckService', () => {
     expect(result).toBe(false);
   });
 
-  it('queries messages collection with both botIdentifier AND chatDataId (DEP-04)', async () => {
+  it("queries messages collection with botIdentifier, chatDataId, and messageStatus $ne 'done'", async () => {
     mockCollection.findOne.mockResolvedValue(null);
     await service.hasProcessingMessage(
       mockDb as unknown as Db,
@@ -49,11 +49,11 @@ describe('MessageCheckService', () => {
     expect(mockCollection.findOne).toHaveBeenCalledWith({
       botIdentifier: 'bot-x',
       chatDataId: 'chat-y',
-      messageStatus: 'processing',
+      messageStatus: { $ne: 'done' },
     });
   });
 
-  it('uses messageStatus processing — not pending (DEP-05)', async () => {
+  it("uses messageStatus $ne 'done' — not a fixed 'processing' match", async () => {
     mockCollection.findOne.mockResolvedValue(null);
     await service.hasProcessingMessage(
       mockDb as unknown as Db,
@@ -61,7 +61,9 @@ describe('MessageCheckService', () => {
       'chat-y',
     );
     const calledFilter = mockCollection.findOne.mock.calls[0][0];
-    expect(calledFilter.messageStatus).toBe('processing');
+    expect(typeof calledFilter.messageStatus).toBe('object');
+    expect(calledFilter.messageStatus.$ne).toBe('done');
+    expect(calledFilter.messageStatus).not.toBe('processing');
     expect(calledFilter.messageStatus).not.toBe('pending');
   });
 });
