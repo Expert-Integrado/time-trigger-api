@@ -5,7 +5,7 @@ milestone_name: Rate Limiting and Message-Run Dependency
 status: executing
 stopped_at: Completed 10-02-PLAN.md
 last_updated: "2026-04-15T12:34:10Z"
-last_activity: 2026-04-17 - Completed quick task 260417-peb: Adicionar .sort({ createdAt: 1 }) na query de runs para processar na ordem de criação
+last_activity: 2026-04-17 - Completed quick task 260417-pss: Alterar MessageCheckService para bloquear run em qualquer messageStatus !== 'done'
 progress:
   total_phases: 3
   completed_phases: 3
@@ -106,9 +106,10 @@ None.
 | 260414-onr | Aplicar claim-first para dispatch e dispatchMessage | 2026-04-14 | 3db0a65 | [260414-onr-aplicar-claim-first-para-dispatch-e-disp](./quick/260414-onr-aplicar-claim-first-para-dispatch-e-disp/) |
 | 260415-dah | Adicionar RATE_LIMIT_RUNS=20, RATE_LIMIT_FUP=20 e RATE_LIMIT_MESSAGES=20 no .env | 2026-04-15 | - | [260415-dah-adicionar-rate-limit-runs-20-rate-limit-](./quick/260415-dah-adicionar-rate-limit-runs-20-rate-limit-/) |
 | 260417-peb | Adicionar .sort({ createdAt: 1 }) na query de runs para processar na ordem de criação | 2026-04-17 | dce030f | [260417-peb-adicionar-sort-createdat-1-na-query-de-r](./quick/260417-peb-adicionar-sort-createdat-1-na-query-de-r/) |
+| 260417-pss | Alterar MessageCheckService para bloquear run em qualquer messageStatus !== 'done' | 2026-04-17 | 6968c91 | [260417-pss-alterar-messagecheckservice-para-bloquea](./quick/260417-pss-alterar-messagecheckservice-para-bloquea/) |
 
 ## Session Continuity
 
-Last session: 2026-04-14T20:56:00Z
-Stopped at: Completed quick task 260414-onr
+Last session: 2026-04-17T21:37:38Z
+Stopped at: Completed quick task 260417-pss
 Resume file: None
