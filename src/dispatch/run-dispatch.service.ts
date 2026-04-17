@@ -248,10 +248,12 @@ export class RunDispatchService {
       // Generic fallback URL (may be undefined for multi-bot DBs)
       const webhookUrl = webhookDoc?.['Processador de Runs'];
 
-      // DETECT-01: find waiting runs with waitUntil in the past
+      // DETECT-01: find waiting runs with waitUntil in the past,
+      // ordered by createdAt ascending to process oldest first
       const runs: Document[] = await db
         .collection('runs')
         .find({ runStatus: 'waiting', waitUntil: { $lte: Date.now() } })
+        .sort({ createdAt: 1 })
         .toArray();
 
       for (const run of runs) {

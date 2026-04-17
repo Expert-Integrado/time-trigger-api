@@ -21,7 +21,8 @@ describe('RunDispatchService', () => {
     fups: Record<string, unknown>[] = [],
     messages: Record<string, unknown>[] = [],
   ) => {
-    const mockRunsFind = { toArray: jest.fn().mockResolvedValue(runs) };
+    const mockRunsFind: any = { toArray: jest.fn().mockResolvedValue(runs) };
+    mockRunsFind.sort = jest.fn().mockReturnValue(mockRunsFind);
     const mockFupsFind = { toArray: jest.fn().mockResolvedValue(fups) };
     const mockMessagesFind = { toArray: jest.fn().mockResolvedValue(messages) };
     const collections: Record<
@@ -127,6 +128,20 @@ describe('RunDispatchService', () => {
         waitUntil: expect.objectContaining({ $lte: expect.any(Number) }),
       }),
     );
+    jest.restoreAllMocks();
+  });
+
+  it('(DETECT-01-SORT) runs query is sorted by createdAt ascending', async () => {
+    const db = makeDb(withinWindowVars, webhooksDoc, []);
+    mongoService.db.mockReturnValue(db as unknown as Db);
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(10);
+    jest.spyOn(Date.prototype, 'getDay').mockReturnValue(allowedDay);
+
+    await service.runRunsCycle();
+
+    const runsFindResult = (db as any)._collections.runs.find.mock.results[0]
+      .value;
+    expect(runsFindResult.sort).toHaveBeenCalledWith({ createdAt: 1 });
     jest.restoreAllMocks();
   });
 
@@ -1384,7 +1399,8 @@ describe('RunDispatchService', () => {
       messages: Record<string, unknown>[] = [],
       updateManyResult: { modifiedCount: number } = { modifiedCount: 0 },
     ) => {
-      const mockRunsFind = { toArray: jest.fn().mockResolvedValue(runs) };
+      const mockRunsFind: any = { toArray: jest.fn().mockResolvedValue(runs) };
+      mockRunsFind.sort = jest.fn().mockReturnValue(mockRunsFind);
       const mockFupsFind = { toArray: jest.fn().mockResolvedValue(fups) };
       const mockMessagesFind = {
         toArray: jest.fn().mockResolvedValue(messages),
